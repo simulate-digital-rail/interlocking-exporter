@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "interlocking-ui-exporter"
+version = "0.9"
+description = ""
+authors = ["OSM HPI <OSM@HPI>"]
+readme = "README.md"
+packages = [{include = "interlocking_ui_exporter"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+yaramo = {git = "https://github.com/simulate-digital-rail/yaramo"}
+
+
+[tool.poetry.group.dev.dependencies]
+cli-importer = {git = "https://github.com/simulate-digital-rail/cli-importer"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
