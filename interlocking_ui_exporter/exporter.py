@@ -61,7 +61,14 @@ class Exporter:
             }
             points[node.uuid] = point
 
-        return json.dumps(points)
+        edges = {}
+        for edge in self.topology.edges.values():
+            items = [edge.node_a.uuid]
+            items += [signal.uuid for signal in sorted(edge.signals, key=lambda x: x.distance_edge)] if len(edge.signals) > 0 else []
+            items += [edge.node_b.uuid]
+            edges[edge.uuid] = {"items": items, "orientation": "normal"}
+
+        return json.dumps({"points": points, "edges": edges})
 
     def __traverse_nodes(self, node: Node, direction: str):
         setattr(node, "direction", direction)
