@@ -10,19 +10,16 @@ class Exporter:
         pass
 
     def export_placement(self) -> str:
-        # find edge that marks topology end
         visited_nodes = {}
         visited_edges = {}
+        # find node that marks topology end
         for edge in self.topology.edges.values():
-            if visited_nodes.get(edge.node_a.uuid):
-                visited_nodes[edge.node_a.uuid] += 1
-            else:
-                visited_nodes[edge.node_a.uuid] = 1
-
-            if visited_nodes.get(edge.node_b.uuid):
-                visited_nodes[edge.node_b.uuid] += 1
-            else:
-                visited_nodes[edge.node_b.uuid] = 1
+            for node in [edge.node_a, edge.node_b]:
+                uuid = node.uuid
+                if visited_nodes.get(uuid):
+                    visited_nodes[uuid] += 1
+                else:
+                    visited_nodes[uuid] = 1
 
             visited_edges[f"{edge.node_a.uuid}.{edge.node_b.uuid}"] = edge
             visited_edges[f"{edge.node_b.uuid}.{edge.node_a.uuid}"] = edge
