@@ -80,26 +80,29 @@ class Exporter:
     def export_placement(self) -> str:
         self.__ensure_nodes_orientations()
 
-        points = {}
+        points = {}        
+        visited_edges = {f"{edge.node_a.uuid}.{edge.node_b.uuid}" : edge.uuid for edge in self.topology.edges.values()}
+        visited_edges = {**visited_edges, **{f"{edge.node_b.uuid}.{edge.node_a.uuid}" : edge.uuid for edge in self.topology.edges.values()}}
+        get_edge_from_nodes = lambda a, b: visited_edges.get(f"{a}.{b}")
         for node in self.topology.nodes.values():
             point = {
-                "toe": node.connected_on_head.uuid if node.connected_on_head else "",
-                "diverting": node.connected_on_right.uuid
+                "toe": get_edge_from_nodes(node.uuid, node.connected_on_head.uuid) if node.connected_on_head else "",
+                "diverting": get_edge_from_nodes(node.uuid, node.connected_on_right.uuid)
                 if node.connected_on_right
                 else ""
                 if node.maximum_speed_on_left
                 and node.maximum_speed_on_right
                 and node.maximum_speed_on_left > node.connected_on_right
-                else node.connected_on_left.uuid
+                else get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
                 if node.connected_on_left
                 else "",
-                "through": node.connected_on_right.uuid
+                "through": get_edge_from_nodes(node.uuid, node.connected_on_right.uuid)
                 if node.connected_on_right
                 else ""
                 if node.maximum_speed_on_left
                 and node.maximum_speed_on_right
                 and node.maximum_speed_on_left > node.connected_on_right
-                else node.connected_on_left.uuid
+                else get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
                 if node.connected_on_left
                 else "",
                 "divertsInDirection": node.__dict__.get("direction"),
