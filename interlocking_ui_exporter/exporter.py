@@ -1,5 +1,5 @@
 import json
-from yaramo.model import Topology, Node, Edge
+from yaramo.model import Topology, Node, Edge, SignalDirection
 
 
 class Exporter:
@@ -18,70 +18,90 @@ class Exporter:
             "trackVacancySections": {},
         }
 
-        edges = {edge.uuid: {
-            "anschlussA": None,
-			"anschlussB": None,
-			"id": edge.uuid,
-			"knotenA": None,
-			"knotenB": None,
-			"laenge": int(edge.length) if edge.length else None
-        } for edge in self.topology.edges.values()}
+        edges = {
+            edge.uuid: {
+                "anschlussA": None,
+                "anschlussB": None,
+                "id": edge.uuid,
+                "knotenA": None,
+                "knotenB": None,
+                "laenge": int(edge.length) if edge.length else None,
+            }
+            for edge in self.topology.edges.values()
+        }
 
-        points = {point.uuid: {
-			"id": point.uuid,
-			"name": point.name,
-			"node": None,
-            "orientation": "FOO",
-			"rastaId": None
-        } for point in self.topology.points.values()}
+        signals = {
+            signal.uuid: {
+                "art": str(signal.kind),
+			    "edge": signal.edge.uuid,
+                "funktion": str(signal.function),
+                "id": signal.uuid,
+                "name": signal.name or "",
+                "offset": signal.distance_edge,
+                "rastaId": None,
+                "wirkrichtung": "normal" if signal.direction == SignalDirection.IN else "reverse"
+            }
+            for signal in self.topology.signals.values()
+        }
+
+        points = {
+            point.uuid: {
+                "id": point.uuid,
+                "name": point.name or "",
+                "node": "",
+                "rastaId": None,
+            }
+            for point in self.topology.nodes.values()
+        }
 
         # Find "node" ids by concatenating edge ids for each node that connects them
         edges_per_node = self.__group_edges_per_node(self.topology.edges.values())
         edge_combinations = []
-        for edges in edges_per_node.values():
-            if len(edges) > 1:
-                for i, _ in enumerate(edges):
-                    for j in range(i+1, len(edges)):
-                        edge_combinations.append(f"{edges[i].uuid}.{edges[j].uuid}")
-        nodes = {edge_combination: {
-			"id": edge_combination
-        } for edge_combination in edge_combinations}
+        for _edges in edges_per_node.values():
+            if len(_edges) > 1:
+                for i, _ in enumerate(_edges):
+                    for j in range(i + 1, len(_edges)):
+                        edge_combinations.append(f"{_edges[i].uuid}.{_edges[j].uuid}")
+        nodes = {
+            edge_combination: {"id": edge_combination}
+            for edge_combination in edge_combinations
+        }
 
-
-
-        return json.dumps({"edges": edges, "nodes": nodes})
+        return json.dumps({
+            "edges": edges,
+            "nodes": nodes,
+            "points": points,
+            "signals": signals,
+            "axleCountingHeads": {},
+            "drivewaySections": {},
+            "trackVacancySections": {}
+            })
 
     def export_placement(self) -> str:
-        # find node that marks topology end
-        visited_nodes = self.__group_edges_per_node(self.topology.edges.values())
-        visited_nodes_length = {node: len(items) for node, items in visited_nodes.items()}
-        start_node = self.topology.nodes.get(min(visited_nodes_length, key=visited_nodes_length.get))
-        start_direction = "normal" if not start_node.connected_on_head else "reverse"
-
-        self.__traverse_nodes(start_node, start_direction)
+        self.__ensure_nodes_orientations()
 
         points = {}
         for node in self.topology.nodes.values():
             point = {
-                "head": node.connected_on_head.uuid if node.connected_on_head else None,
+                "toe": node.connected_on_head.uuid if node.connected_on_head else "",
                 "diverting": node.connected_on_right.uuid
                 if node.connected_on_right
-                else None
+                else ""
                 if node.maximum_speed_on_left
                 and node.maximum_speed_on_right
                 and node.maximum_speed_on_left > node.connected_on_right
                 else node.connected_on_left.uuid
                 if node.connected_on_left
-                else None,
+                else "",
                 "through": node.connected_on_right.uuid
                 if node.connected_on_right
-                else None
+                else ""
                 if node.maximum_speed_on_left
                 and node.maximum_speed_on_right
                 and node.maximum_speed_on_left > node.connected_on_right
                 else node.connected_on_left.uuid
                 if node.connected_on_left
-                else None,
+                else "",
                 "divertsInDirection": node.__dict__.get("direction"),
                 "orientation": "Left"
                 if node.__dict__.get("direction") == "normal"
@@ -92,11 +112,32 @@ class Exporter:
         edges = {}
         for edge in self.topology.edges.values():
             items = [edge.node_a.uuid]
-            items += [signal.uuid for signal in sorted(edge.signals, key=lambda x: x.distance_edge)] if len(edge.signals) > 0 else []
+            items += (
+                [
+                    signal.uuid
+                    for signal in sorted(edge.signals, key=lambda x: x.distance_edge)
+                ]
+                if len(edge.signals) > 0
+                else []
+            )
             items += [edge.node_b.uuid]
             edges[edge.uuid] = {"items": items, "orientation": "normal"}
 
         return json.dumps({"points": points, "edges": edges})
+
+    def __ensure_nodes_orientations(self):
+        # find nodes that mark topology ends
+        visited_nodes = self.__group_edges_per_node(self.topology.edges.values())
+        visited_nodes_length = {
+            node: len(items) for node, items in visited_nodes.items()
+        }
+
+        # use on of the ends as start for a graph traversal
+        start_node = self.topology.nodes.get(
+            min(visited_nodes_length, key=visited_nodes_length.get)
+        )
+        start_direction = "normal" if not start_node.connected_on_head else "reverse"
+        self.__set_node_orientation(start_node, start_direction)
 
     def __group_edges_per_node(self, edges: list[Edge]) -> dict[Node, list[Edge]]:
         visited_nodes = {}
@@ -109,9 +150,8 @@ class Exporter:
                     visited_nodes[uuid] = [edge]
         return visited_nodes
 
-    def __traverse_nodes(self, node: Node, direction: str):
+    def __set_node_orientation(self, node: Node, direction: str):
         setattr(node, "direction", direction)
-        # node["direction"] = direction
 
         for connected_node in node.connected_nodes:
             if not connected_node.__dict__.get("direction"):
@@ -133,4 +173,4 @@ class Exporter:
                     "reverse" if next_node_direction == "normal" else "normal"
                 )
 
-                self.__traverse_nodes(connected_node, next_node_direction)
+                self.__set_node_orientation(connected_node, next_node_direction)
