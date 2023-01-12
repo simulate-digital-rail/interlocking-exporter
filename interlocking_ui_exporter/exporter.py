@@ -13,18 +13,9 @@ class Exporter:
         visited_nodes = {}
         visited_edges = {}
         # find node that marks topology end
-        for edge in self.topology.edges.values():
-            for node in [edge.node_a, edge.node_b]:
-                uuid = node.uuid
-                if visited_nodes.get(uuid):
-                    visited_nodes[uuid] += 1
-                else:
-                    visited_nodes[uuid] = 1
-
-            visited_edges[f"{edge.node_a.uuid}.{edge.node_b.uuid}"] = edge
-            visited_edges[f"{edge.node_b.uuid}.{edge.node_a.uuid}"] = edge
-
-        start_node = self.topology.nodes.get(min(visited_nodes, key=visited_nodes.get))
+        visited_nodes = self.__group_edges_per_node(self.topology.edges.values())
+        visited_nodes_length = {node: len(items) for node, items in visited_nodes.items()}
+        start_node = self.topology.nodes.get(min(visited_nodes_length, key=visited_nodes_length.get))
         start_direction = "normal" if not start_node.connected_on_head else "reverse"
 
         self.__traverse_nodes(start_node, start_direction)
@@ -66,6 +57,17 @@ class Exporter:
             edges[edge.uuid] = {"items": items, "orientation": "normal"}
 
         return json.dumps({"points": points, "edges": edges})
+
+    def __group_edges_per_node(self, edges: list[Edge]) -> dict[Node, list[Edge]]:
+        visited_nodes = {}
+        for edge in edges:
+            for node in [edge.node_a, edge.node_b]:
+                uuid = node.uuid
+                if visited_nodes.get(uuid):
+                    visited_nodes.get(uuid).append(edge)
+                else:
+                    visited_nodes[uuid] = [edge]
+        return visited_nodes
 
     def __traverse_nodes(self, node: Node, direction: str):
         setattr(node, "direction", direction)
