@@ -1,5 +1,5 @@
 import json
-from yaramo.model import Topology, Node
+from yaramo.model import Topology, Node, Edge
 
 
 class Exporter:
@@ -7,11 +7,51 @@ class Exporter:
         self.topology = topology
 
     def export_topology(self) -> str:
-        pass
+        topology = {
+            "axleCountingHeads": {},
+            "drivewaySections": {},
+            "edges": {},
+            "nodes": {},
+            "points": {},
+            "signals": {},
+            "trackVacancySections": {},
+            "trackVacancySections": {},
+        }
+
+        edges = {edge.uuid: {
+            "anschlussA": None,
+			"anschlussB": None,
+			"id": edge.uuid,
+			"knotenA": None,
+			"knotenB": None,
+			"laenge": int(edge.length) if edge.length else None
+        } for edge in self.topology.edges.values()}
+
+        points = {point.uuid: {
+			"id": point.uuid,
+			"name": point.name,
+			"node": None,
+            "orientation": "FOO",
+			"rastaId": None
+        } for point in self.topology.points.values()}
+
+        # Find "node" ids by concatenating edge ids for each node that connects them
+        edges_per_node = self.__group_edges_per_node(self.topology.edges.values())
+        edge_combinations = []
+        for edges in edges_per_node.values():
+            if len(edges) > 1:
+                for i, _ in enumerate(edges):
+                    for j in range(i+1, len(edges)):
+                        edge_combinations.append(f"{edges[i].uuid}.{edges[j].uuid}")
+        nodes = {edge_combination: {
+			"id": edge_combination
+        } for edge_combination in edge_combinations}
+
+
+
+        return json.dumps({"edges": edges, "nodes": nodes})
 
     def export_placement(self) -> str:
-        visited_nodes = {}
-        visited_edges = {}
         # find node that marks topology end
         visited_nodes = self.__group_edges_per_node(self.topology.edges.values())
         visited_nodes_length = {node: len(items) for node, items in visited_nodes.items()}
