@@ -44,7 +44,12 @@ class Exporter:
                 "rastaId": None,
             }
             for point in self.topology.nodes.values()
-            if None not in [point.connected_on_head, point.connected_on_left, point.connected_on_right]
+            if None
+            not in [
+                point.connected_on_head,
+                point.connected_on_left,
+                point.connected_on_right,
+            ]
         }
 
         # Find "node" ids by concatenating edge ids for each node that connects them
@@ -60,17 +65,31 @@ class Exporter:
             for edge_combination in edge_combinations
         }
 
-        return json.dumps(
-            {
+        # Add extra axlecountingheads for edges with nodes that don't have further connections
+        axleCountingHeads = {}
+        for _edges in edges_per_node.values():
+            if len(_edges) > 1:
+                continue
+            _edge = _edges[0]
+            tmp = Node()
+            head = {
+                "edge": _edge.uuid,
+                "id": tmp.uuid,
+                "limits": [],
+                "name": "",
+                "position": 0.1,
+            }
+            axleCountingHeads[tmp.uuid] = head
+
+        return {
                 "edges": edges,
                 "nodes": nodes,
                 "points": points,
                 "signals": signals,
-                "axleCountingHeads": {},
+                "axleCountingHeads": axleCountingHeads,
                 "drivewaySections": {},
                 "trackVacancySections": {},
             }
-        )
 
     def export_placement(self) -> str:
         self.__ensure_nodes_orientations()
@@ -89,11 +108,16 @@ class Exporter:
         }
         get_edge_from_nodes = lambda a, b: visited_edges.get(f"{a}.{b}")
         for node in self.topology.nodes.values():
-            if None in [node.connected_on_head, node.connected_on_left, node.connected_on_right]:
+            if None in [
+                node.connected_on_head,
+                node.connected_on_left,
+                node.connected_on_right,
+            ]:
                 continue
             diverting, through = "", ""
-            if node.connected_on_right and node.connected_on_left:                
-                through = (get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
+            if node.connected_on_right and node.connected_on_left:
+                through = (
+                    get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
                     if node.connected_on_left
                     else ""
                     if node.maximum_speed_on_left
@@ -129,7 +153,7 @@ class Exporter:
 
         edges = {}
         for edge in self.topology.edges.values():
-            items = [edge.node_a.uuid]
+            items = [edge.node_a.uuid] if len(edge.node_a.connected_nodes) > 1 else []
             items += (
                 [
                     signal.uuid
@@ -138,10 +162,10 @@ class Exporter:
                 if len(edge.signals) > 0
                 else []
             )
-            items += [edge.node_b.uuid]
+            items += [edge.node_b.uuid] if len(edge.node_b.connected_nodes) > 1 else []
             edges[edge.uuid] = {"items": items, "orientation": "normal"}
 
-        return json.dumps({"points": points, "edges": edges})
+        return {"points": points, "edges": edges}
 
     def __ensure_nodes_orientations(self):
         # find nodes that mark topology ends
