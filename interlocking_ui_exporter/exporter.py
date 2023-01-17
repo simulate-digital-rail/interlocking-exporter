@@ -7,16 +7,6 @@ class Exporter:
         self.topology = topology
 
     def export_topology(self) -> str:
-        topology = {
-            "axleCountingHeads": {},
-            "drivewaySections": {},
-            "edges": {},
-            "nodes": {},
-            "points": {},
-            "signals": {},
-            "trackVacancySections": {},
-            "trackVacancySections": {},
-        }
 
         edges = {
             edge.uuid: {
@@ -33,13 +23,15 @@ class Exporter:
         signals = {
             signal.uuid: {
                 "art": str(signal.kind),
-			    "edge": signal.edge.uuid,
+                "edge": signal.edge.uuid,
                 "funktion": str(signal.function),
                 "id": signal.uuid,
                 "name": signal.name or "",
                 "offset": signal.distance_edge,
                 "rastaId": None,
-                "wirkrichtung": "normal" if signal.direction == SignalDirection.IN else "reverse"
+                "wirkrichtung": "normal"
+                if signal.direction == SignalDirection.IN
+                else "reverse",
             }
             for signal in self.topology.signals.values()
         }
@@ -52,6 +44,7 @@ class Exporter:
                 "rastaId": None,
             }
             for point in self.topology.nodes.values()
+            if None not in [point.connected_on_head, point.connected_on_left, point.connected_on_right]
         }
 
         # Find "node" ids by concatenating edge ids for each node that connects them
@@ -67,44 +60,66 @@ class Exporter:
             for edge_combination in edge_combinations
         }
 
-        return json.dumps({
-            "edges": edges,
-            "nodes": nodes,
-            "points": points,
-            "signals": signals,
-            "axleCountingHeads": {},
-            "drivewaySections": {},
-            "trackVacancySections": {}
-            })
+        return json.dumps(
+            {
+                "edges": edges,
+                "nodes": nodes,
+                "points": points,
+                "signals": signals,
+                "axleCountingHeads": {},
+                "drivewaySections": {},
+                "trackVacancySections": {},
+            }
+        )
 
     def export_placement(self) -> str:
         self.__ensure_nodes_orientations()
 
-        points = {}        
-        visited_edges = {f"{edge.node_a.uuid}.{edge.node_b.uuid}" : edge.uuid for edge in self.topology.edges.values()}
-        visited_edges = {**visited_edges, **{f"{edge.node_b.uuid}.{edge.node_a.uuid}" : edge.uuid for edge in self.topology.edges.values()}}
+        points = {}
+        visited_edges = {
+            f"{edge.node_a.uuid}.{edge.node_b.uuid}": edge.uuid
+            for edge in self.topology.edges.values()
+        }
+        visited_edges = {
+            **visited_edges,
+            **{
+                f"{edge.node_b.uuid}.{edge.node_a.uuid}": edge.uuid
+                for edge in self.topology.edges.values()
+            },
+        }
         get_edge_from_nodes = lambda a, b: visited_edges.get(f"{a}.{b}")
         for node in self.topology.nodes.values():
+            if None in [node.connected_on_head, node.connected_on_left, node.connected_on_right]:
+                continue
+            diverting, through = "", ""
+            if node.connected_on_right and node.connected_on_left:                
+                through = (get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
+                    if node.connected_on_left
+                    else ""
+                    if node.maximum_speed_on_left
+                    and node.maximum_speed_on_right
+                    and node.maximum_speed_on_left > node.connected_on_right
+                    else get_edge_from_nodes(node.uuid, node.connected_on_right.uuid)
+                    if node.connected_on_right
+                    else ""
+                )
+                diverting = (
+                    get_edge_from_nodes(node.uuid, node.connected_on_right.uuid)
+                    if node.connected_on_right
+                    else ""
+                    if node.maximum_speed_on_left
+                    and node.maximum_speed_on_right
+                    and node.maximum_speed_on_left > node.connected_on_right
+                    else get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
+                    if node.connected_on_left
+                    else ""
+                )
             point = {
-                "toe": get_edge_from_nodes(node.uuid, node.connected_on_head.uuid) if node.connected_on_head else "",
-                "diverting": get_edge_from_nodes(node.uuid, node.connected_on_right.uuid)
-                if node.connected_on_right
-                else ""
-                if node.maximum_speed_on_left
-                and node.maximum_speed_on_right
-                and node.maximum_speed_on_left > node.connected_on_right
-                else get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
-                if node.connected_on_left
+                "toe": get_edge_from_nodes(node.uuid, node.connected_on_head.uuid)
+                if node.connected_on_head
                 else "",
-                "through": get_edge_from_nodes(node.uuid, node.connected_on_right.uuid)
-                if node.connected_on_right
-                else ""
-                if node.maximum_speed_on_left
-                and node.maximum_speed_on_right
-                and node.maximum_speed_on_left > node.connected_on_right
-                else get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
-                if node.connected_on_left
-                else "",
+                "diverting": diverting,
+                "through": through,
                 "divertsInDirection": node.__dict__.get("direction"),
                 "orientation": "Left"
                 if node.__dict__.get("direction") == "normal"
