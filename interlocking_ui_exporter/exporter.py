@@ -217,27 +217,39 @@ class Exporter:
                         "reverse" if divertsInDirection == "normal" else "normal"
                     )
 
-            # Set orientation
+            # Do not overwrite orientation
             if (
                 not connected_node.__dict__.get("orientation")
-                and not connected_node.connected_on_head == node
             ):
-                next_node_orientation = "Left" if orientation == "normal" else "Right"
+                next_node_orientation = None
 
-                if (
-                    connected_node.connected_on_left == node
-                    and node.connected_on_left == connected_node
-                ):
-                    next_node_orientation = "Left"
-                elif (
-                    connected_node.connected_on_right == node
-                    and node.connected_on_right == connected_node
-                ):
-                    next_node_orientation = "Right"
-                elif connected_node.connected_on_left == node and node.connected_on_right == connected_node:
-                    next_node_orientation = "Right"
-                elif connected_node.connected_on_right == node and node.connected_on_left == connected_node:
-                    next_node_orientation = "Left"
+                if(connected_node.connected_on_head == node):
+                    next_node_orientation = self.__get_node_orientation_based_on_neighbours(connected_node, divertsInDirection)
+
+                if next_node_orientation == None:
+                    if (
+                        connected_node.connected_on_left == node
+                        and node.connected_on_left == connected_node
+                    ):
+                        next_node_orientation = "Left"
+                    elif (
+                        connected_node.connected_on_right == node
+                        and node.connected_on_right == connected_node
+                    ):
+                        next_node_orientation = "Right"
+                    elif (
+                        connected_node.connected_on_left == node
+                        and node.connected_on_right == connected_node
+                    ):
+                        next_node_orientation = "Right"
+                    elif (
+                        connected_node.connected_on_right == node
+                        and node.connected_on_left == connected_node
+                    ):
+                        next_node_orientation = "Left"
+                    else:
+                        # Default
+                        next_node_orientation = "Left" if orientation == "normal" else "Right"
 
                 self.__set_node_orientation(
                     connected_node, next_node_orientation, next_node_diverting_direction
@@ -245,3 +257,32 @@ class Exporter:
 
     def __is_point(self, node: Node):
         return len(node.connected_nodes) == 3
+
+    def __get_node_orientation_based_on_neighbours(self, node: Node, divertsInDirection: str):
+        head = node.connected_on_head
+        head_connection = None if not head else self.__get_connected_on_neighbour_orientation(node, head)
+        left = node.connected_on_left 
+        left_connection = None if not left else self.__get_connected_on_neighbour_orientation(node, left)
+        right = node.connected_on_right
+        right_connection = None if not right else self.__get_connected_on_neighbour_orientation(node, right)
+
+        if head_connection == 'Head':
+            if left_connection == 'Left' or 'Right':
+                return left_connection
+            if right_connection == 'Left' or 'Right':
+                return right_connection
+        else:
+            if right_connection == 'Right':
+                return 'Right' if right.__dict__.get('orienation') == 'Right' else 'Left'
+            if left_connection == 'Left':
+                return 'Left' if left.__dict__.get('orienation') == 'Left' else 'Right'
+        return None
+
+    def __get_connected_on_neighbour_orientation(self, node: Node, neighbour: Node):
+        if neighbour.connected_on_head == node:
+            return 'Head'
+        if neighbour.connected_on_right == node:
+            return 'Right'
+        if neighbour.connected_on_left == node:
+            return 'Left'
+        return None
