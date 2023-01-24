@@ -204,7 +204,7 @@ class Exporter:
         for connected_node in next_node_order:
             # Set divertionDirection
             if not connected_node.__dict__.get("divertsInDirection"):
-                next_node_diverting_direction = "normal"
+                next_node_diverting_direction = divertsInDirection
 
                 if (
                     connected_node.connected_on_head == node
