@@ -110,30 +110,17 @@ class Exporter:
         for node in self.topology.nodes.values():
             if not self.__is_point(node):
                 continue
-            diverting, through = "", ""
-            if node.connected_on_right and node.connected_on_left:
-                through = (
-                    get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
-                    if node.connected_on_left
-                    else ""
-                    if node.maximum_speed_on_left
-                    and node.maximum_speed_on_right
-                    and node.maximum_speed_on_left > node.connected_on_right
-                    else get_edge_from_nodes(node.uuid, node.connected_on_right.uuid)
-                    if node.connected_on_right
-                    else ""
-                )
-                diverting = (
-                    get_edge_from_nodes(node.uuid, node.connected_on_right.uuid)
-                    if node.connected_on_right
-                    else ""
-                    if node.maximum_speed_on_left
-                    and node.maximum_speed_on_right
-                    and node.maximum_speed_on_left > node.connected_on_right
-                    else get_edge_from_nodes(node.uuid, node.connected_on_left.uuid)
-                    if node.connected_on_left
-                    else ""
-                )
+            diverting = (
+                get_edge_from_nodes(node.uuid, node.connected_on_left)
+                if node.__dict__.get("orientation") == "Left"
+                else get_edge_from_nodes(node.uuid, node.connected_on_right)
+            )
+            through = (
+                get_edge_from_nodes(node.uuid, node.connected_on_right)
+                if node.__dict__.get("orientation") == "Left"
+                else get_edge_from_nodes(node.uuid, node.connected_on_left)
+            )
+
             point = {
                 "toe": get_edge_from_nodes(node.uuid, node.connected_on_head.uuid)
                 if node.connected_on_head
