@@ -6,7 +6,7 @@ class Exporter:
     def __init__(self, topology: Topology) -> None:
         self.topology = topology
 
-    def export_topology(self) -> str:
+    def export_topology(self) -> dict:
 
         edges = {
             edge.uuid: {
@@ -68,30 +68,30 @@ class Exporter:
         # Add extra axlecountingheads for edges with nodes that don't have further connections
         axleCountingHeads = {}
         for _edges in edges_per_node.values():
-            if len(_edges) > 1:
+            if len(_edges) > 2:
                 continue
-            _edge = _edges[0]
-            tmp = Node()
-            head = {
-                "edge": _edge.uuid,
-                "id": tmp.uuid,
-                "limits": [],
-                "name": "",
-                "position": 0.1,
-            }
-            axleCountingHeads[tmp.uuid] = head
+            for _edge in _edges:
+                tmp = Node()
+                head = {
+                    "edge": _edge.uuid,
+                    "id": tmp.uuid,
+                    "limits": [],
+                    "name": "",
+                    "position": 0.1,
+                }
+                axleCountingHeads[tmp.uuid] = head
 
         return {
-                "edges": edges,
-                "nodes": nodes,
-                "points": points,
-                "signals": signals,
-                "axleCountingHeads": axleCountingHeads,
-                "drivewaySections": {},
-                "trackVacancySections": {},
-            }
+            "edges": edges,
+            "nodes": nodes,
+            "points": points,
+            "signals": signals,
+            "axleCountingHeads": axleCountingHeads,
+            "drivewaySections": {},
+            "trackVacancySections": {},
+        }
 
-    def export_placement(self) -> str:
+    def export_placement(self) -> dict:
         self.__ensure_nodes_orientations()
 
         points = {}
@@ -108,11 +108,7 @@ class Exporter:
         }
         get_edge_from_nodes = lambda a, b: visited_edges.get(f"{a}.{b}")
         for node in self.topology.nodes.values():
-            if None in [
-                node.connected_on_head,
-                node.connected_on_left,
-                node.connected_on_right,
-            ]:
+            if not self.__is_point(node):
                 continue
             diverting, through = "", ""
             if node.connected_on_right and node.connected_on_left:
@@ -144,16 +140,14 @@ class Exporter:
                 else "",
                 "diverting": diverting,
                 "through": through,
-                "divertsInDirection": node.__dict__.get("direction"),
-                "orientation": "Left"
-                if node.__dict__.get("direction") == "normal"
-                else "Right",
+                "divertsInDirection": node.__dict__.get("divertsInDirection"),
+                "orientation": node.__dict__.get("orientation"),
             }
             points[node.uuid] = point
 
         edges = {}
         for edge in self.topology.edges.values():
-            items = [edge.node_a.uuid] if len(edge.node_a.connected_nodes) > 1 else []
+            items = [edge.node_a.uuid] if self.__is_point(edge.node_a) else []
             items += (
                 [
                     signal.uuid
@@ -162,7 +156,7 @@ class Exporter:
                 if len(edge.signals) > 0
                 else []
             )
-            items += [edge.node_b.uuid] if len(edge.node_b.connected_nodes) > 1 else []
+            items += [edge.node_b.uuid] if self.__is_point(edge.node_b) else []
             edges[edge.uuid] = {"items": items, "orientation": "normal"}
 
         return {"points": points, "edges": edges}
@@ -174,12 +168,18 @@ class Exporter:
             node: len(items) for node, items in visited_nodes.items()
         }
 
-        # use on of the ends as start for a graph traversal
+        # Use one of the ends as start for a graph traversal
         start_node = self.topology.nodes.get(
             min(visited_nodes_length, key=visited_nodes_length.get)
         )
-        start_direction = "normal" if not start_node.connected_on_head else "reverse"
-        self.__set_node_orientation(start_node, start_direction)
+        start_diversion_direction = (
+            "normal"
+            if start_node.connected_nodes[0].connected_on_head == start_node
+            else "reverse"
+        )
+        self.__set_node_orientation(
+            start_node.connected_nodes[0], "Left", start_diversion_direction
+        )
 
     def __group_edges_per_node(self, edges: list[Edge]) -> dict[Node, list[Edge]]:
         visited_nodes = {}
@@ -192,27 +192,69 @@ class Exporter:
                     visited_nodes[uuid] = [edge]
         return visited_nodes
 
-    def __set_node_orientation(self, node: Node, direction: str):
-        setattr(node, "direction", direction)
+    def __set_node_orientation(
+        self, node: Node, orientation: str, divertsInDirection: str
+    ):
+        if orientation:
+            setattr(node, "orientation", orientation)
+        if divertsInDirection:
+            setattr(node, "divertsInDirection", divertsInDirection)
 
-        for connected_node in node.connected_nodes:
-            if not connected_node.__dict__.get("direction"):
-                next_node_direction = "normal"
+        # Try to go in a straight line first, to ensure an orientation for all those nodes,
+        # which can than be used to find an orientation for all the diverting ones.
+        next_node_order = [node.connected_on_head] if node.connected_on_head else []
+        if orientation == "Left":
+            if node.connected_on_right:
+                next_node_order.append(node.connected_on_right)
+            if node.connected_on_left:
+                next_node_order.append(node.connected_on_left)
+        else:
+            if node.connected_on_left:
+                next_node_order.append(node.connected_on_left)
+            if node.connected_on_right:
+                next_node_order.append(node.connected_on_right)
+
+        for connected_node in next_node_order:
+            # Set divertionDirection
+            if not connected_node.__dict__.get("divertsInDirection"):
+                next_node_diverting_direction = "normal"
+
+                if (
+                    connected_node.connected_on_head == node
+                    and node.connected_on_head == connected_node
+                ) or (
+                    connected_node.connected_on_head != node
+                    and node.connected_on_head != connected_node
+                ):
+                    next_node_diverting_direction = (
+                        "reverse" if divertsInDirection == "normal" else "normal"
+                    )
+
+            # Set orientation
+            if (
+                not connected_node.__dict__.get("orientation")
+                and not connected_node.connected_on_head == node
+            ):
+                next_node_orientation = "Left" if orientation == "normal" else "Right"
+
                 if (
                     connected_node.connected_on_left == node
-                    or connected_node.connected_on_right == node
+                    and node.connected_on_left == connected_node
                 ):
-                    next_node_direction = (
-                        "reverse" if direction == "normal" else "normal"
-                    )
-                if connected_node.connected_on_head == node:
-                    next_node_direction = (
-                        "normal" if direction == "normal" else "reverse"
-                    )
+                    next_node_orientation = "Left"
+                elif (
+                    connected_node.connected_on_right == node
+                    and node.connected_on_right == connected_node
+                ):
+                    next_node_orientation = "Right"
+                elif connected_node.connected_on_left == node and node.connected_on_right == connected_node:
+                    next_node_orientation = "Right"
+                elif connected_node.connected_on_right == node and node.connected_on_left == connected_node:
+                    next_node_orientation = "Left"
 
-                # flip direction if connected node is connected on the head of this node
-                next_node_direction = (
-                    "reverse" if next_node_direction == "normal" else "normal"
+                self.__set_node_orientation(
+                    connected_node, next_node_orientation, next_node_diverting_direction
                 )
 
-                self.__set_node_orientation(connected_node, next_node_direction)
+    def __is_point(self, node: Node):
+        return len(node.connected_nodes) == 3
