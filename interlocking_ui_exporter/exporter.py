@@ -69,6 +69,18 @@ class Exporter:
                 if current_edge:
                     # Save current_edge in case of an ending
                     edges[current_edge.uuid] = current_edge
+
+                    # connect current node to the last unmerged node
+                    current_other_node = edge.node_a if edge.node_a != node else edge.node_b
+                    other_node = current_edge.node_a if current_edge.node_a != node else current_edge.node_b
+
+                    if node.connected_on_head == current_other_node:
+                        node.connected_on_head = other_node
+                    elif node.connected_on_left == current_other_node:
+                        node.connected_on_left = other_node
+                    elif node.connected_on_right == current_other_node:
+                        node.connected_on_right = other_node
+
                 else:
                     edges[edge.uuid] = edge
 
