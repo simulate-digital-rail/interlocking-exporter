@@ -61,7 +61,7 @@ class Exporter:
                 # Assign signals of merged edge to current edge and vice versa
                 for signal in sorted(next_edge.signals, key=lambda x: x.distance_edge):
                     signal.edge = edge
-                    current_edge.signals += signal.uuid
+                    current_edge.signals.append(signal)
                 
                 merge_binary_connected_nodes(node, next_node, current_edge, edges, deleted_points)
 
@@ -70,16 +70,30 @@ class Exporter:
                     # Save current_edge in case of an ending
                     edges[current_edge.uuid] = current_edge
 
-                    # connect current node to the last unmerged node
-                    current_other_node = edge.node_a if edge.node_a != node else edge.node_b
-                    other_node = current_edge.node_a if current_edge.node_a != node else current_edge.node_b
+                    # swap the end node of the merged edge with node
+                    current_edge_start_node = current_edge.node_a if current_edge.node_b.uuid in deleted_points else current_edge.node_b
+                    current_edge_end_node =  current_edge.node_b if current_edge.node_b.uuid in deleted_points else current_edge.node_a
+                    if current_edge.node_a == current_edge_end_node:
+                        current_edge.node_a = node
+                    else:
+                        current_edge.node_b = node        
 
-                    if node.connected_on_head == current_other_node:
-                        node.connected_on_head = other_node
-                    elif node.connected_on_left == current_other_node:
-                        node.connected_on_left = other_node
-                    elif node.connected_on_right == current_other_node:
-                        node.connected_on_right = other_node
+                    # Connect node with the merged edge's start node
+                    currently_connected_node = edge.node_a if edge.node_a != node else edge.node_b
+                    if node.connected_on_head == currently_connected_node:
+                        node.connected_on_head = current_edge_start_node
+                    elif node.connected_on_left == currently_connected_node:
+                        node.connected_on_left = current_edge_start_node
+                    elif node.connected_on_right == currently_connected_node:
+                        node.connected_on_right = current_edge_start_node
+
+                    # Connect current edge's start node with node
+                    if current_edge_start_node.connected_on_head == current_edge_end_node:
+                        current_edge_start_node.connected_on_head = node
+                    elif current_edge_start_node.connected_on_left == current_edge_end_node:
+                        current_edge_start_node.connected_on_left = node
+                    elif current_edge_start_node.connected_on_right == current_edge_end_node:
+                        current_edge_start_node.connected_on_right = node
 
                 else:
                     edges[edge.uuid] = edge
