@@ -17,19 +17,9 @@ class Exporter:
             node: len(items) for node, items in visited_nodes.items()
         }
 
-        points = {}
-        visited_edges = {
-            f"{edge.node_a.uuid}.{edge.node_b.uuid}": edge.uuid
-            for edge in self.topology.edges.values()
-        }
-        visited_edges = {
-            **visited_edges,
-            **{
-                f"{edge.node_b.uuid}.{edge.node_a.uuid}": edge.uuid
-                for edge in self.topology.edges.values()
-            },
-        }
-        get_edge_from_nodes = lambda a, b: self.topology.edges.get(visited_edges.get(f"{a}.{b}"))
+        visited_edges = self.__map_connected_nodes_to_edge(self.topology.edges.values())
+        
+        get_edge_from_nodes = lambda a, b: self.topology.edges.get(visited_edges.get(f"{a}.{b}")[0])
 
         # Use one of the ends as start for a graph traversal
         start_node = self.topology.nodes.get(
@@ -201,17 +191,7 @@ class Exporter:
     def export_placement(self) -> dict:     
 
         points = {}
-        visited_edges = {}
-        for edge in self.topology.edges.values():
-            if visited_edges.get(f"{edge.node_a.uuid}.{edge.node_b.uuid}"):
-                visited_edges.get(f"{edge.node_a.uuid}.{edge.node_b.uuid}").append(edge.uuid)
-            else:
-                visited_edges[f"{edge.node_a.uuid}.{edge.node_b.uuid}"] = [edge.uuid]
-
-            if visited_edges.get(f"{edge.node_b.uuid}.{edge.node_a.uuid}"):
-                visited_edges.get(f"{edge.node_b.uuid}.{edge.node_a.uuid}").append(edge.uuid)
-            else:
-                visited_edges[f"{edge.node_b.uuid}.{edge.node_a.uuid}"] = [edge.uuid]
+        visited_edges = self.__map_connected_nodes_to_edge(self.topology.edges.values())
 
         get_edges_from_nodes = lambda a, b: visited_edges.get(f"{a}.{b}")
         for node in self.topology.nodes.values():
@@ -417,3 +397,17 @@ class Exporter:
         if neighbour.connected_on_left == node:
             return 'Left'
         return None
+
+    def __map_connected_nodes_to_edge(self, edges: list[Edge]) -> dict[str, str]:
+        visited_edges = {}
+        for edge in edges:
+            if visited_edges.get(f"{edge.node_a.uuid}.{edge.node_b.uuid}"):
+                visited_edges.get(f"{edge.node_a.uuid}.{edge.node_b.uuid}").append(edge.uuid)
+            else:
+                visited_edges[f"{edge.node_a.uuid}.{edge.node_b.uuid}"] = [edge.uuid]
+
+            if visited_edges.get(f"{edge.node_b.uuid}.{edge.node_a.uuid}"):
+                visited_edges.get(f"{edge.node_b.uuid}.{edge.node_a.uuid}").append(edge.uuid)
+            else:
+                visited_edges[f"{edge.node_b.uuid}.{edge.node_a.uuid}"] = [edge.uuid]
+        return visited_edges
