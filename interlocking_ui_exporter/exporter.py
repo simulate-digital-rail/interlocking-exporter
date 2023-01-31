@@ -5,6 +5,86 @@ from yaramo.model import Topology, Node, Edge, SignalDirection
 class Exporter:
     def __init__(self, topology: Topology) -> None:
         self.topology = topology
+        self.__clean_topology()
+
+    def __clean_topology(self):
+    # remove false nodes and edges
+
+        # find nodes that mark topology ends
+        visited_nodes = self.__group_edges_per_node(self.topology.edges.values())
+        visited_nodes_length = {
+            node: len(items) for node, items in visited_nodes.items()
+        }
+
+        points = {}
+        visited_edges = {
+            f"{edge.node_a.uuid}.{edge.node_b.uuid}": edge.uuid
+            for edge in self.topology.edges.values()
+        }
+        visited_edges = {
+            **visited_edges,
+            **{
+                f"{edge.node_b.uuid}.{edge.node_a.uuid}": edge.uuid
+                for edge in self.topology.edges.values()
+            },
+        }
+        get_edge_from_nodes = lambda a, b: self.topology.edges.get(visited_edges.get(f"{a}.{b}"))
+
+        # Use one of the ends as start for a graph traversal
+        start_node = self.topology.nodes.get(
+            min(visited_nodes_length, key=visited_nodes_length.get)
+        )
+
+        edges: dict[str, Edge] = {}
+        deleted_points: dict[str, Node] = {}
+
+
+        def merge_binary_connected_nodes(previous_node: Node, node: Node, current_edge: Edge | None, edges: dict[str, Edge], deleted_points: dict[str, Node]):
+            edge = get_edge_from_nodes(previous_node, node)
+
+            if edge.__dict__.get('visited'):
+                return
+            edge.__dict__['visited'] = True
+            next_nodes = node.connected_nodes
+
+            # We need to merge this node
+            if len(next_nodes) == 2:
+                next_node = next_nodes[0] if next_nodes[0] != previous_node else next_nodes[1]
+                next_edge = get_edge_from_nodes(node, next_node)
+
+                deleted_points[node.uuid] = node
+
+                # We are already in process of merging an edge
+                if current_edge is None:
+                    current_edge = edge
+                    
+                # Assign signals of merged edge to current edge and vice versa
+                for signal in sorted(next_edge.signals, key=lambda x: x.distance_edge):
+                    signal.edge = edge
+                    current_edge.signals += signal.uuid
+                
+                merge_binary_connected_nodes(node, next_node, current_edge, edges, deleted_points)
+
+            else:
+                if current_edge:
+                    # Save current_edge in case of an ending
+                    edges[current_edge.uuid] = current_edge
+                else:
+                    edges[edge.uuid] = edge
+
+                # Go on with a fresh edge
+                for next_node in next_nodes:
+                    if next_node != previous_node:
+                        merge_binary_connected_nodes(node, next_node, None, edges, deleted_points)
+
+        merge_binary_connected_nodes(start_node, start_node.connected_nodes[0], None, edges, deleted_points)
+
+        # Remove merged points from the topology nodes
+        for deleted_point_id in deleted_points.keys():
+            self.topology.nodes.pop(deleted_point_id)
+
+        # Keep the merged edges as topology edges
+        self.topology.edges = edges
 
     def export_topology(self) -> dict:
 
