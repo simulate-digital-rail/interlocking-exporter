@@ -5,6 +5,7 @@ from yaramo.model import Topology, Node, Edge, SignalDirection
 class Exporter:
     def __init__(self, topology: Topology) -> None:
         self.topology = topology
+        self.__ensure_nodes_orientations()
         self.__clean_topology()
 
     def __clean_topology(self):
@@ -197,38 +198,62 @@ class Exporter:
             "trackVacancySections": {},
         }
 
-    def export_placement(self) -> dict:
-        self.__ensure_nodes_orientations()
+    def export_placement(self) -> dict:     
 
         points = {}
-        visited_edges = {
-            f"{edge.node_a.uuid}.{edge.node_b.uuid}": edge.uuid
-            for edge in self.topology.edges.values()
-        }
-        visited_edges = {
-            **visited_edges,
-            **{
-                f"{edge.node_b.uuid}.{edge.node_a.uuid}": edge.uuid
-                for edge in self.topology.edges.values()
-            },
-        }
-        get_edge_from_nodes = lambda a, b: visited_edges.get(f"{a}.{b}")
+        visited_edges = {}
+        for edge in self.topology.edges.values():
+            if visited_edges.get(f"{edge.node_a.uuid}.{edge.node_b.uuid}"):
+                visited_edges.get(f"{edge.node_a.uuid}.{edge.node_b.uuid}").append(edge.uuid)
+            else:
+                visited_edges[f"{edge.node_a.uuid}.{edge.node_b.uuid}"] = [edge.uuid]
+
+            if visited_edges.get(f"{edge.node_b.uuid}.{edge.node_a.uuid}"):
+                visited_edges.get(f"{edge.node_b.uuid}.{edge.node_a.uuid}").append(edge.uuid)
+            else:
+                visited_edges[f"{edge.node_b.uuid}.{edge.node_a.uuid}"] = [edge.uuid]
+
+        get_edges_from_nodes = lambda a, b: visited_edges.get(f"{a}.{b}")
         for node in self.topology.nodes.values():
             if not self.__is_point(node):
                 continue
-            diverting = (
-                get_edge_from_nodes(node.uuid, node.connected_on_left)
-                if node.__dict__.get("orientation") == "Left"
-                else get_edge_from_nodes(node.uuid, node.connected_on_right)
-            )
-            through = (
-                get_edge_from_nodes(node.uuid, node.connected_on_right)
-                if node.__dict__.get("orientation") == "Left"
-                else get_edge_from_nodes(node.uuid, node.connected_on_left)
-            )
+
+            edges_right = get_edges_from_nodes(node.uuid, node.connected_on_right)
+            edges_left = get_edges_from_nodes(node.uuid, node.connected_on_left)
+
+            # We found two points being connected by two edges
+            if edges_right == edges_left:
+                # We already connected them once
+                other_nodes_right_edge = None
+                if node.connected_on_left.__dict__.get('right_edge'):
+                    # Assign edges to match previous assignment
+                    other_nodes_right_edge = node.connected_on_left.__dict__.get('right_edge')
+                    other_nodes_left_edge = edges_right[0] if edges_right[0] != other_nodes_right_edge else edges_right[1]
+
+                    diverting = other_nodes_right_edge if node.__dict__.get("orientation") == "Left" else other_nodes_left_edge
+                    through = other_nodes_right_edge if node.__dict__.get("orientation") == "Right" else other_nodes_left_edge
+                # We see them the first time
+                else:
+                    # Choose randomly
+                    diverting = edges_left[0]
+                    through = edges_left[1]
+
+                    node.__dict__["right_edge"] = diverting if node.__dict__.get("orientation") == "Right" else through
+            else:
+                # There are different edges and the are onl singular
+                diverting = (
+                    get_edges_from_nodes(node.uuid, node.connected_on_left)[0]
+                    if node.__dict__.get("orientation") == "Left"
+                    else get_edges_from_nodes(node.uuid, node.connected_on_right)[0]
+                )
+                through = (
+                    get_edges_from_nodes(node.uuid, node.connected_on_right)[0]
+                    if node.__dict__.get("orientation") == "Left"
+                    else get_edges_from_nodes(node.uuid, node.connected_on_left)[0]
+                )
 
             point = {
-                "toe": get_edge_from_nodes(node.uuid, node.connected_on_head.uuid)
+                "toe": get_edges_from_nodes(node.uuid, node.connected_on_head.uuid)[0]
                 if node.connected_on_head
                 else "",
                 "diverting": diverting,
