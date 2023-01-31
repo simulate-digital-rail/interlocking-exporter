@@ -9,9 +9,9 @@ class Exporter:
         self.__clean_topology()
 
     def __clean_topology(self):
-    # remove false nodes and edges
+        """Remove false nodes and edges from the topology"""
 
-        # find nodes that mark topology ends
+        # Find nodes that mark topology ends
         visited_nodes = self.__group_edges_per_node(self.topology.edges.values())
         visited_nodes_length = {
             node: len(items) for node, items in visited_nodes.items()
@@ -31,8 +31,14 @@ class Exporter:
 
 
         def merge_binary_connected_nodes(previous_node: Node, node: Node, current_edge: Edge | None, edges: dict[str, Edge], deleted_points: dict[str, Node]):
+            """Merge edges that are connected by a node that is only connected to two other nodes.
+            Such nodes are not points and will be discarded for the Interlocking-UI.
+            This will keep the original edge uuid of the first edge being part of the merge and add all signals to that edge.
+            Real points connected to deleted nodes will be reconnected to the remaining points.
+            This will modify the edges dict which will then contain all valid edges and the deleted_points dict which will contain all the deleted points."""
             edge = get_edge_from_nodes(previous_node, node)
 
+            # Do not run in circles. Mark as visited.
             if edge.__dict__.get('visited'):
                 return
             edge.__dict__['visited'] = True
@@ -54,14 +60,16 @@ class Exporter:
                     signal.edge = edge
                     current_edge.signals.append(signal)
                 
+                # Check on the following node
                 merge_binary_connected_nodes(node, next_node, current_edge, edges, deleted_points)
 
             else:
+                # There is an active merged edge that ends here
                 if current_edge:
-                    # Save current_edge in case of an ending
+                    # Save current_edge 
                     edges[current_edge.uuid] = current_edge
 
-                    # swap the end node of the merged edge with node
+                    # Swap the end node of the merged edge with node
                     current_edge_start_node = current_edge.node_a if current_edge.node_b.uuid in deleted_points else current_edge.node_b
                     current_edge_end_node =  current_edge.node_b if current_edge.node_b.uuid in deleted_points else current_edge.node_a
                     if current_edge.node_a == current_edge_end_node:
@@ -86,6 +94,7 @@ class Exporter:
                     elif current_edge_start_node.connected_on_right == current_edge_end_node:
                         current_edge_start_node.connected_on_right = node
 
+                # This is just a normal point. Save it.
                 else:
                     edges[edge.uuid] = edge
 
@@ -103,8 +112,9 @@ class Exporter:
         # Keep the merged edges as topology edges
         self.topology.edges = edges
 
-    def export_topology(self) -> dict:
-
+    def export_topology(self, extra_axleCountingHeads = False) -> dict:
+        """Export the topology as a dict containing attributes needed by the Interlocking-UI.
+        This can optinally add extra AxleCountingHeads on edges that contain no further items."""
         edges = {
             edge.uuid: {
                 "anschlussA": None,
@@ -149,7 +159,7 @@ class Exporter:
             ]
         }
 
-        # Find "node" ids by concatenating edge ids for each node that connects them
+        # Find node ids by concatenating edge ids for each node that connects them
         edges_per_node = self.__group_edges_per_node(self.topology.edges.values())
         edge_combinations = []
         for _edges in edges_per_node.values():
@@ -164,19 +174,20 @@ class Exporter:
 
         # Add extra axlecountingheads for edges with nodes that don't have further connections
         axleCountingHeads = {}
-        for _edges in edges_per_node.values():
-            if len(_edges) > 2:
-                continue
-            for _edge in _edges:
-                tmp = Node()
-                head = {
-                    "edge": _edge.uuid,
-                    "id": tmp.uuid,
-                    "limits": [],
-                    "name": "",
-                    "position": 0.1,
-                }
-                axleCountingHeads[tmp.uuid] = head
+        if extra_axleCountingHeads:
+            for _edges in edges_per_node.values():
+                if len(_edges) > 2:
+                    continue
+                for _edge in _edges:
+                    tmp = Node()
+                    head = {
+                        "edge": _edge.uuid,
+                        "id": tmp.uuid,
+                        "limits": [],
+                        "name": "",
+                        "position": 0.1,
+                    }
+                    axleCountingHeads[tmp.uuid] = head
 
         return {
             "edges": edges,
@@ -189,11 +200,12 @@ class Exporter:
         }
 
     def export_placement(self) -> dict:     
-
+        """Export the placement of points and edges as a dict containing attributes needed by the Interlocking-UI"""
         points = {}
         visited_edges = self.__map_connected_nodes_to_edge(self.topology.edges.values())
-
         get_edges_from_nodes = lambda a, b: visited_edges.get(f"{a}.{b}")
+
+        # Determine for each point the connected edges and to which branch the connect to
         for node in self.topology.nodes.values():
             if not self.__is_point(node):
                 continue
@@ -260,7 +272,8 @@ class Exporter:
         return {"points": points, "edges": edges}
 
     def __ensure_nodes_orientations(self):
-        # find nodes that mark topology ends
+        """Make sure that each node has the attributes 'orientation' and 'divertsInDirection' set correctly"""
+        # Find nodes that mark topology ends
         visited_nodes = self.__group_edges_per_node(self.topology.edges.values())
         visited_nodes_length = {
             node: len(items) for node, items in visited_nodes.items()
@@ -270,16 +283,20 @@ class Exporter:
         start_node = self.topology.nodes.get(
             min(visited_nodes_length, key=visited_nodes_length.get)
         )
+
+        # We assume that we start going from left to right
         start_diversion_direction = (
             "normal"
             if start_node.connected_nodes[0].connected_on_head == start_node
             else "reverse"
         )
-        self.__set_node_orientation(
+
+        self.__set_node_orientation_and_diversion(
             start_node.connected_nodes[0], "Left", start_diversion_direction
         )
 
     def __group_edges_per_node(self, edges: list[Edge]) -> dict[Node, list[Edge]]:
+        """For each node list the edges it is part of"""
         visited_nodes = {}
         for edge in edges:
             for node in [edge.node_a, edge.node_b]:
@@ -290,9 +307,10 @@ class Exporter:
                     visited_nodes[uuid] = [edge]
         return visited_nodes
 
-    def __set_node_orientation(
+    def __set_node_orientation_and_diversion(
         self, node: Node, orientation: str, divertsInDirection: str
     ):
+        """"Set each the orientaiton and diversion direction for each node based on the topology"""
         if orientation:
             setattr(node, "orientation", orientation)
         if divertsInDirection:
@@ -335,7 +353,7 @@ class Exporter:
                 next_node_orientation = None
 
                 if(connected_node.connected_on_head == node):
-                    next_node_orientation = self.__get_node_orientation_based_on_neighbours(connected_node, divertsInDirection)
+                    next_node_orientation = self.__get_node_orientation_based_on_neighbours(connected_node)
 
                 if next_node_orientation == None:
                     if (
@@ -362,20 +380,24 @@ class Exporter:
                         # Default
                         next_node_orientation = "Left" if orientation == "normal" else "Right"
 
-                self.__set_node_orientation(
+                self.__set_node_orientation_and_diversion(
                     connected_node, next_node_orientation, next_node_diverting_direction
                 )
 
     def __is_point(self, node: Node):
         return len(node.connected_nodes) == 3
 
-    def __get_node_orientation_based_on_neighbours(self, node: Node, divertsInDirection: str):
+    def __get_node_orientation_based_on_neighbours(self, node: Node):
+        """Try to find the node orientation based on the connection to a neighbour.
+        This works for the cases of being connected head-to-head, right-to-right or left-to-left.
+        For other cases we cannot give a definitive answer.
+        """
         head = node.connected_on_head
-        head_connection = None if not head else self.__get_connected_on_neighbour_orientation(node, head)
+        head_connection = None if not head else self.__get_connection_on_neighbour_node(node, head)
         left = node.connected_on_left 
-        left_connection = None if not left else self.__get_connected_on_neighbour_orientation(node, left)
+        left_connection = None if not left else self.__get_connection_on_neighbour_node(node, left)
         right = node.connected_on_right
-        right_connection = None if not right else self.__get_connected_on_neighbour_orientation(node, right)
+        right_connection = None if not right else self.__get_connection_on_neighbour_node(node, right)
 
         if head_connection == 'Head':
             if left_connection == 'Left' or 'Right':
@@ -389,7 +411,8 @@ class Exporter:
                 return 'Left' if left.__dict__.get('orienation') == 'Left' else 'Right'
         return None
 
-    def __get_connected_on_neighbour_orientation(self, node: Node, neighbour: Node):
+    def __get_connection_on_neighbour_node(self, node: Node, neighbour: Node):
+        """Get the branch where this node is connected to the neighbour node"""
         if neighbour.connected_on_head == node:
             return 'Head'
         if neighbour.connected_on_right == node:
@@ -399,6 +422,9 @@ class Exporter:
         return None
 
     def __map_connected_nodes_to_edge(self, edges: list[Edge]) -> dict[str, str]:
+        """Create a dict pointing from two node uuids to the edge they connect.
+        Both combinations of node_a and node_b a part of the dict and point to the same edge.
+        """
         visited_edges = {}
         for edge in edges:
             if visited_edges.get(f"{edge.node_a.uuid}.{edge.node_b.uuid}"):
