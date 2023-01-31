@@ -19,7 +19,7 @@ class Exporter:
 
         visited_edges = self.__map_connected_nodes_to_edge(self.topology.edges.values())
         
-        get_edge_from_nodes = lambda a, b: self.topology.edges.get(visited_edges.get(f"{a}.{b}")[0])
+        get_edge_from_nodes = lambda a, b: self.topology.edges.get(visited_edges.get((a,b))[0])
 
         # Use one of the ends as start for a graph traversal
         start_node = self.topology.nodes.get(
@@ -37,6 +37,7 @@ class Exporter:
             Real points connected to deleted nodes will be reconnected to the remaining points.
             This will modify the edges dict which will then contain all valid edges and the deleted_points dict which will contain all the deleted points."""
             edge = get_edge_from_nodes(previous_node, node)
+            # edge = self.topology.get_edge_by_nodes(previous_node, node)
 
             # Do not run in circles. Mark as visited.
             if edge.__dict__.get('visited'):
@@ -195,7 +196,7 @@ class Exporter:
             "points": points,
             "signals": signals,
             "axleCountingHeads": axleCountingHeads,
-            "drivewaySections": {},
+            "routes": {},
             "trackVacancySections": {},
         }
 
@@ -203,18 +204,18 @@ class Exporter:
         """Export the placement of points and edges as a dict containing attributes needed by the Interlocking-UI"""
         points = {}
         visited_edges = self.__map_connected_nodes_to_edge(self.topology.edges.values())
-        get_edges_from_nodes = lambda a, b: visited_edges.get(f"{a}.{b}")
+        get_edges_from_nodes = lambda a, b: visited_edges.get((a,b))
 
         # Determine for each point the connected edges and to which branch the connect to
         for node in self.topology.nodes.values():
             if not self.__is_point(node):
                 continue
 
-            edges_right = get_edges_from_nodes(node.uuid, node.connected_on_right)
-            edges_left = get_edges_from_nodes(node.uuid, node.connected_on_left)
+            edges_right = get_edges_from_nodes(node, node.connected_on_right)
+            edges_left = get_edges_from_nodes(node, node.connected_on_left)
 
             # We found two points being connected by two edges
-            if edges_right == edges_left:
+            if edges_right and edges_left and edges_right == edges_left:
                 # We already connected them once
                 other_nodes_right_edge = None
                 if node.connected_on_left.__dict__.get('right_edge'):
@@ -232,20 +233,20 @@ class Exporter:
 
                     node.__dict__["right_edge"] = diverting if node.__dict__.get("orientation") == "Right" else through
             else:
-                # There are different edges and the are onl singular
+                # There are different edges and the are only singular
                 diverting = (
-                    get_edges_from_nodes(node.uuid, node.connected_on_left)[0]
+                    get_edges_from_nodes(node, node.connected_on_left)[0]
                     if node.__dict__.get("orientation") == "Left"
-                    else get_edges_from_nodes(node.uuid, node.connected_on_right)[0]
+                    else get_edges_from_nodes(node, node.connected_on_right)[0]
                 )
                 through = (
-                    get_edges_from_nodes(node.uuid, node.connected_on_right)[0]
+                    get_edges_from_nodes(node, node.connected_on_right)[0]
                     if node.__dict__.get("orientation") == "Left"
-                    else get_edges_from_nodes(node.uuid, node.connected_on_left)[0]
+                    else get_edges_from_nodes(node, node.connected_on_left)[0]
                 )
 
             point = {
-                "toe": get_edges_from_nodes(node.uuid, node.connected_on_head.uuid)[0]
+                "toe": get_edges_from_nodes(node, node.connected_on_head)[0]
                 if node.connected_on_head
                 else "",
                 "diverting": diverting,
@@ -427,13 +428,13 @@ class Exporter:
         """
         visited_edges = {}
         for edge in edges:
-            if visited_edges.get(f"{edge.node_a.uuid}.{edge.node_b.uuid}"):
-                visited_edges.get(f"{edge.node_a.uuid}.{edge.node_b.uuid}").append(edge.uuid)
+            if visited_edges.get((edge.node_a,edge.node_b)):
+                visited_edges.get((edge.node_a,edge.node_b)).append(edge.uuid)
             else:
-                visited_edges[f"{edge.node_a.uuid}.{edge.node_b.uuid}"] = [edge.uuid]
+                visited_edges[(edge.node_a,edge.node_b)] = [edge.uuid]
 
-            if visited_edges.get(f"{edge.node_b.uuid}.{edge.node_a.uuid}"):
-                visited_edges.get(f"{edge.node_b.uuid}.{edge.node_a.uuid}").append(edge.uuid)
+            if visited_edges.get((edge.node_b, edge.node_a)):
+                visited_edges.get((edge.node_b, edge.node_a)).append(edge.uuid)
             else:
-                visited_edges[f"{edge.node_b.uuid}.{edge.node_a.uuid}"] = [edge.uuid]
+                visited_edges[(edge.node_b, edge.node_a)] = [edge.uuid]
         return visited_edges
