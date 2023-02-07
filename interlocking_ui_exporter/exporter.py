@@ -189,8 +189,15 @@ class Exporter:
             else "reverse"
         )
 
+        # We assume that we start going from left to right
+        start_orientation = (
+            "Left"
+            if start_diversion_direction == "normal"
+            else "Right"
+        )
+
         self.__set_node_orientation_and_diversion(
-            start_node.connected_nodes[0], "Left", start_diversion_direction
+            start_node.connected_nodes[0], start_orientation, start_diversion_direction
         )
 
     def __group_edges_per_node(self, edges: list[Edge]) -> dict[Node, list[Edge]]:
