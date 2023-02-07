@@ -186,7 +186,7 @@ class Exporter:
                         "id": tmp.uuid,
                         "limits": [],
                         "name": "",
-                        "position": 0.1,
+                        "position": 0.01,
                     }
                     axleCountingHeads[tmp.uuid] = head
 
@@ -233,7 +233,7 @@ class Exporter:
 
                     node.__dict__["right_edge"] = diverting if node.__dict__.get("orientation") == "Right" else through
             else:
-                # There are different edges and the are only singular
+                # There are different edges and they are only singular
                 diverting = (
                     get_edges_from_nodes(node, node.connected_on_left)[0]
                     if node.__dict__.get("orientation") == "Left"
