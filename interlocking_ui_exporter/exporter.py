@@ -7,7 +7,7 @@ class Exporter:
         self.topology = topology
         self.__ensure_nodes_orientations()
 
-    def export_topology(self, extra_axleCountingHeads = False) -> dict:
+    def export_topology(self, extra_axleCountingHeads=False) -> dict:
         """Export the topology as a dict containing attributes needed by the Interlocking-UI.
         This can optinally add extra AxleCountingHeads on edges that contain no further items."""
         edges = {
@@ -94,11 +94,11 @@ class Exporter:
             "trackVacancySections": {},
         }
 
-    def export_placement(self) -> dict:     
+    def export_placement(self) -> dict:
         """Export the placement of points and edges as a dict containing attributes needed by the Interlocking-UI"""
         points = {}
         visited_edges = self.__map_connected_nodes_to_edge(self.topology.edges.values())
-        get_edges_from_nodes = lambda a, b: visited_edges.get((a,b))
+        get_edges_from_nodes = lambda a, b: visited_edges.get((a, b))
 
         # Determine for each point the connected edges and to which branch the connect to
         for node in self.topology.nodes.values():
@@ -112,20 +112,38 @@ class Exporter:
             if edges_right and edges_left and edges_right == edges_left:
                 # We already connected them once
                 other_nodes_right_edge = None
-                if node.connected_on_left.__dict__.get('right_edge'):
+                if node.connected_on_left.__dict__.get("right_edge"):
                     # Assign edges to match previous assignment
-                    other_nodes_right_edge = node.connected_on_left.__dict__.get('right_edge')
-                    other_nodes_left_edge = edges_right[0] if edges_right[0] != other_nodes_right_edge else edges_right[1]
+                    other_nodes_right_edge = node.connected_on_left.__dict__.get(
+                        "right_edge"
+                    )
+                    other_nodes_left_edge = (
+                        edges_right[0]
+                        if edges_right[0] != other_nodes_right_edge
+                        else edges_right[1]
+                    )
 
-                    diverting = other_nodes_right_edge if node.__dict__.get("orientation") == "Left" else other_nodes_left_edge
-                    through = other_nodes_right_edge if node.__dict__.get("orientation") == "Right" else other_nodes_left_edge
+                    diverting = (
+                        other_nodes_right_edge
+                        if node.__dict__.get("orientation") == "Left"
+                        else other_nodes_left_edge
+                    )
+                    through = (
+                        other_nodes_right_edge
+                        if node.__dict__.get("orientation") == "Right"
+                        else other_nodes_left_edge
+                    )
                 # We see them the first time
                 else:
                     # Choose randomly
                     diverting = edges_left[0]
                     through = edges_left[1]
 
-                    node.__dict__["right_edge"] = diverting if node.__dict__.get("orientation") == "Right" else through
+                    node.__dict__["right_edge"] = (
+                        diverting
+                        if node.__dict__.get("orientation") == "Right"
+                        else through
+                    )
             else:
                 # There are different edges and they are only singular
                 diverting = (
@@ -205,7 +223,7 @@ class Exporter:
     def __set_node_orientation_and_diversion(
         self, node: Node, orientation: str, divertsInDirection: str
     ):
-        """"Set each the orientaiton and diversion direction for each node based on the topology"""
+        """ "Set each the orientaiton and diversion direction for each node based on the topology"""
         if orientation:
             setattr(node, "orientation", orientation)
         if divertsInDirection:
@@ -242,21 +260,23 @@ class Exporter:
                     )
 
             # Do not overwrite orientation
-            if (
-                not connected_node.__dict__.get("orientation")
-            ):
+            if not connected_node.__dict__.get("orientation"):
                 if connected_node.turnout_side:
                     if connected_node.turnout_side.lower() == "left":
                         next_node_orientation = "Left"
                     else:
                         next_node_orientation = "Right"
                     self.__set_node_orientation_and_diversion(
-                        connected_node, next_node_orientation, next_node_diverting_direction
+                        connected_node,
+                        next_node_orientation,
+                        next_node_diverting_direction,
                     )
                 next_node_orientation = None
 
-                if(connected_node.connected_on_head == node):
-                    next_node_orientation = self.__get_node_orientation_based_on_neighbours(connected_node)
+                if connected_node.connected_on_head == node:
+                    next_node_orientation = (
+                        self.__get_node_orientation_based_on_neighbours(connected_node)
+                    )
 
                 if next_node_orientation == None:
                     if (
@@ -281,7 +301,9 @@ class Exporter:
                         next_node_orientation = "Left"
                     else:
                         # Default
-                        next_node_orientation = "Left" if orientation == "normal" else "Right"
+                        next_node_orientation = (
+                            "Left" if orientation == "normal" else "Right"
+                        )
 
                 self.__set_node_orientation_and_diversion(
                     connected_node, next_node_orientation, next_node_diverting_direction
@@ -296,32 +318,40 @@ class Exporter:
         For other cases we cannot give a definitive answer.
         """
         head = node.connected_on_head
-        head_connection = None if not head else self.__get_connection_on_neighbour_node(node, head)
-        left = node.connected_on_left 
-        left_connection = None if not left else self.__get_connection_on_neighbour_node(node, left)
+        head_connection = (
+            None if not head else self.__get_connection_on_neighbour_node(node, head)
+        )
+        left = node.connected_on_left
+        left_connection = (
+            None if not left else self.__get_connection_on_neighbour_node(node, left)
+        )
         right = node.connected_on_right
-        right_connection = None if not right else self.__get_connection_on_neighbour_node(node, right)
+        right_connection = (
+            None if not right else self.__get_connection_on_neighbour_node(node, right)
+        )
 
-        if head_connection == 'Head':
-            if left_connection == 'Left' or 'Right':
+        if head_connection == "Head":
+            if left_connection == "Left" or "Right":
                 return left_connection
-            if right_connection == 'Left' or 'Right':
+            if right_connection == "Left" or "Right":
                 return right_connection
         else:
-            if right_connection == 'Right':
-                return 'Right' if right.__dict__.get('orienation') == 'Right' else 'Left'
-            if left_connection == 'Left':
-                return 'Left' if left.__dict__.get('orienation') == 'Left' else 'Right'
+            if right_connection == "Right":
+                return (
+                    "Right" if right.__dict__.get("orienation") == "Right" else "Left"
+                )
+            if left_connection == "Left":
+                return "Left" if left.__dict__.get("orienation") == "Left" else "Right"
         return None
 
     def __get_connection_on_neighbour_node(self, node: Node, neighbour: Node):
         """Get the branch where this node is connected to the neighbour node"""
         if neighbour.connected_on_head == node:
-            return 'Head'
+            return "Head"
         if neighbour.connected_on_right == node:
-            return 'Right'
+            return "Right"
         if neighbour.connected_on_left == node:
-            return 'Left'
+            return "Left"
         return None
 
     def __map_connected_nodes_to_edge(self, edges: list[Edge]) -> dict[str, str]:
@@ -330,10 +360,10 @@ class Exporter:
         """
         visited_edges = {}
         for edge in edges:
-            if visited_edges.get((edge.node_a,edge.node_b)):
-                visited_edges.get((edge.node_a,edge.node_b)).append(edge.uuid)
+            if visited_edges.get((edge.node_a, edge.node_b)):
+                visited_edges.get((edge.node_a, edge.node_b)).append(edge.uuid)
             else:
-                visited_edges[(edge.node_a,edge.node_b)] = [edge.uuid]
+                visited_edges[(edge.node_a, edge.node_b)] = [edge.uuid]
 
             if visited_edges.get((edge.node_b, edge.node_a)):
                 visited_edges.get((edge.node_b, edge.node_a)).append(edge.uuid)
