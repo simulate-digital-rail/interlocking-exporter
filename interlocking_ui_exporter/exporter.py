@@ -245,6 +245,14 @@ class Exporter:
             if (
                 not connected_node.__dict__.get("orientation")
             ):
+                if connected_node.turnout_side:
+                    if connected_node.turnout_side.lower() == "left":
+                        next_node_orientation = "Left"
+                    else:
+                        next_node_orientation = "Right"
+                    self.__set_node_orientation_and_diversion(
+                        connected_node, next_node_orientation, next_node_diverting_direction
+                    )
                 next_node_orientation = None
 
                 if(connected_node.connected_on_head == node):
