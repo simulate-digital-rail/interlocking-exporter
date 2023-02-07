@@ -7,7 +7,7 @@ class Exporter:
         self.topology = topology
         self.__ensure_nodes_orientations()
 
-    def export_topology(self, extra_axleCountingHeads=False) -> dict:
+    def export_topology(self) -> dict:
         """Export the topology as a dict containing attributes needed by the Interlocking-UI.
         This can optinally add extra AxleCountingHeads on edges that contain no further items."""
         edges = {
@@ -30,7 +30,7 @@ class Exporter:
                 "id": signal.uuid,
                 "name": signal.name or "",
                 "offset": signal.distance_edge,
-                "rastaId": None,
+                "rastaId": 1234567890,
                 "wirkrichtung": "normal"
                 if signal.direction == SignalDirection.IN
                 else "reverse",
@@ -67,22 +67,7 @@ class Exporter:
             for edge_combination in edge_combinations
         }
 
-        # Add extra axlecountingheads for edges with nodes that don't have further connections
         axleCountingHeads = {}
-        if extra_axleCountingHeads:
-            for _edges in edges_per_node.values():
-                if len(_edges) > 2:
-                    continue
-                for _edge in _edges:
-                    tmp = Node()
-                    head = {
-                        "edge": _edge.uuid,
-                        "id": tmp.uuid,
-                        "limits": [],
-                        "name": "",
-                        "position": 0.01,
-                    }
-                    axleCountingHeads[tmp.uuid] = head
 
         return {
             "edges": edges,
