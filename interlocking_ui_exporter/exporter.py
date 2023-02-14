@@ -126,7 +126,7 @@ class Exporter:
 
                     node.__dict__["right_edge"] = (
                         diverting
-                        if node.__dict__.get("orientation") == "Right"
+                        if node.__dict__.get("divertsInDirection") == "normal"
                         else through
                     )
             else:
