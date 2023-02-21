@@ -1,11 +1,55 @@
 import json
-from yaramo.model import Topology, Node, Edge, SignalDirection
-
+from yaramo.model import Topology, Node, Edge, SignalDirection, Signal
+from yaramo.additional_signal import AdditionalSignalZs3, AdditionalSignalZs3v
+from railwayroutegenerator.routegenerator import RouteGenerator
 
 class Exporter:
     def __init__(self, topology: Topology) -> None:
         self.topology = topology
+        RouteGenerator(self.topology).generate_routes()
         self.__ensure_nodes_orientations()
+
+    def export_routes(self):
+        output = []
+        for route in self.topology.routes:
+            previous_node = route.start_signal.previous_node()
+            route_json = []
+            signal_state, additional_signal_states = self.generate_signal_state(
+                route.start_signal, route.maximum_speed
+            )
+            route_json.append(signal_state)
+            for signal in additional_signal_states:
+                route_json.append(signal)
+            for edge in route.edges:
+                # find out which node comes first on the driveway because edges can be oriented both ways
+                if edge.node_a == previous_node:
+                    current_node = edge.node_b
+                else:
+                    current_node = edge.node_a
+                # find out whether the previous point needs to be in a specific position
+                match current_node:
+                    case previous_node.connected_on_left:
+                        route_json.append(
+                            {"uuid": previous_node.uuid, "type": "point", "state": "left"}
+                        )
+                    case previous_node.connected_on_right:
+                        route_json.append(
+                            {"uuid": previous_node.uuid, "type": "point", "state": "right"}
+                        )
+                # find out whether the current point needs to be in a specific position
+                match previous_node:
+                    case current_node.connected_on_left:
+                        route_json.append(
+                            {"uuid": current_node.uuid, "type": "point", "state": "left"}
+                        )
+                    case current_node.connected_on_right:
+                        route_json.append(
+                            {"uuid": current_node.uuid, "type": "point", "state": "right"}
+                        )
+                previous_node = current_node
+            output.append(route_json)
+        with open("driveways.json", "w", encoding="utf-8") as json_file:
+            json.dump(output, json_file)
 
     def export_topology(self) -> dict:
         """Export the topology as a dict containing attributes needed by the Interlocking-UI.
@@ -99,6 +143,22 @@ class Exporter:
                 "tpsName": id[:8]
             }
 
+        def flatten(l):
+            return [item for sublist in l for item in sublist]
+
+        routes = {}
+        for route in self.topology.routes.values():
+            route_points = set(flatten([[edge.node_a.uuid, edge.node_b.uuid] for edge in list(route.edges)]))
+            not_points = {point_id for point_id in route_points if not self.__is_point(self.topology.nodes[point_id])}
+            route_points = list(route_points.difference(not_points))
+            routes[route.uuid] = {
+                "id": route.uuid,
+			    "start": route.start_signal.uuid,
+                "end": route.end_signal.uuid,
+                "points": route_points,
+			    "tvps": [edge.vacancy_section.uuid for edge in route.edges]
+            }
+
         self.topology.__dict__["axleCountingHeads"] = axleCountingHeads
         return {
             "edges": edges,
@@ -106,7 +166,7 @@ class Exporter:
             "points": points,
             "signals": signals,
             "axleCountingHeads": axleCountingHeads,
-            "routes": {},
+            "routes": routes,
             "trackVacancySections": trackVacancySections,
         }
 
@@ -396,3 +456,46 @@ class Exporter:
             else:
                 visited_edges[(edge.node_b, edge.node_a)] = [edge.uuid]
         return visited_edges
+
+    
+    def generate_signal_state(self,
+        signal: Signal, max_speed: int | None
+    ) -> tuple[dict, list[dict]]:
+        additional_signals = []
+        if max_speed:
+            for add_signal in signal.additional_signals:
+                if isinstance(add_signal, AdditionalSignalZs3):
+                    symbol = next(
+                        (s for s in add_signal.symbols if s.value == max_speed // 10), None
+                    )
+                    if symbol:
+                        additional_signals.append(
+                            {
+                                "uuid": add_signal.uuid,
+                                "type": "additional_signal_zs3",
+                                "symbols": [s.value for s in add_signal.symbols],
+                                "state": symbol.value,
+                            }
+                        )
+                if isinstance(add_signal, AdditionalSignalZs3v):
+                    symbol = next(
+                        (s for s in add_signal.symbols if s.value == max_speed // 10), None
+                    )
+                    if symbol:
+                        additional_signals.append(
+                            {
+                                "uuid": add_signal.uuid,
+                                "type": "additional_signal_zs3v",
+                                "symbols": [s.value for s in add_signal.symbols],
+                                "state": symbol.value,
+                            }
+                        )
+        return (
+            {
+                "uuid": signal.uuid,
+                "name": signal.name,
+                "type": "signal",
+                "state": "Ks1",
+            },
+            additional_signals,
+        )

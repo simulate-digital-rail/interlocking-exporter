@@ -9,6 +9,7 @@ packages = [{include = "interlocking_ui_exporter"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 yaramo = {git = "https://github.com/simulate-digital-rail/yaramo"}
+railway-route-generator = {git = "https://github.com/simulate-digital-rail/railway-route-generator.git"}
 
 
 [tool.poetry.group.dev.dependencies]

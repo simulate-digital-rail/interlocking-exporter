@@ -284,6 +284,24 @@ tomli = ">=1.0.0"
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "xmlschema"]
 
 [[package]]
+name = "railway-route-generator"
+version = "3.0.0"
+description = ""
+category = "main"
+optional = false
+python-versions = "^3.10"
+develop = false
+
+[package.dependencies]
+yaramo = {git = "https://github.com/simulate-digital-rail/yaramo"}
+
+[package.source]
+type = "git"
+url = "https://github.com/simulate-digital-rail/railway-route-generator.git"
+reference = "HEAD"
+resolved_reference = "d36440e34c0aaff7dc0e375944fbf38d4591bfd5"
+
+[[package]]
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -358,7 +376,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=6)", "pytest-black (>=
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "b10be0c9cfa0cccef8793e13281bbc3531880ca5946a4f4edaf60bc08f256533"
+content-hash = "d452084b929f15781fcde1dfbbe17b667947dfa3f3a29e335ebb32586110ed51"
 
 [metadata.files]
 atomicwrites = [
@@ -617,6 +635,7 @@ pytest = [
     {file = "pytest-7.1.2-py3-none-any.whl", hash = "sha256:13d0e3ccfc2b6e26be000cb6568c832ba67ba32e719443bfe725814d3c42433c"},
     {file = "pytest-7.1.2.tar.gz", hash = "sha256:a06a0425453864a270bc45e71f783330a7428defb4230fb5e6a731fde06ecd45"},
 ]
+railway-route-generator = []
 six = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
