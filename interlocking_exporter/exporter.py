@@ -16,7 +16,7 @@ class Exporter:
 
     def export_routes(self):
         output = []
-        for route in self.topology.routes:
+        for route in self.topology.routes.values():
             previous_node = route.start_signal.previous_node()
             route_json = []
             signal_state, additional_signal_states = self.generate_signal_state(
