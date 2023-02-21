@@ -14,6 +14,8 @@ yaramo = {git = "https://github.com/simulate-digital-rail/yaramo"}
 [tool.poetry.group.dev.dependencies]
 cli-importer = {git = "https://github.com/simulate-digital-rail/cli-importer"}
 orm-importer = {git = "https://github.com/simulate-digital-rail/orm-importer.git"}
+websockets = "^10.4"
+vacancy-section-generator = {git = "https://github.com/simulate-digital-rail/vacancy-section-generator.git"}
 
 [build-system]
 requires = ["poetry-core"]

@@ -68,7 +68,38 @@ class Exporter:
         }
 
         axleCountingHeads = {}
+        trackVacancySections = {}
+        for id, edge in self.topology.edges.items():
+            tvs = edge.vacancy_section
+            axleCountingHeadL = {
+                "edge": id,
+                "id": Node().uuid,
+                "limits": [tvs.uuid],
+                "name": f"{edge.signals[0].name or id[:8]} / L",
+                "position": 0.1
+            }
+            axleCountingHeadR = {
+                "edge": id,
+                "id": Node().uuid,
+                "limits": [tvs.uuid],
+                "name": f"{edge.signals[-1].name or id[:8]} / R",
+                "position": 0.9
+            }
+            axleCountingHeads[axleCountingHeadL.get("id")] = axleCountingHeadL
+            axleCountingHeads[axleCountingHeadR.get("id")] = axleCountingHeadR
 
+            trackVacancySections[tvs.uuid] = {
+                "id": tvs.uuid,
+                "limits": [
+                    axleCountingHeadL.get("id"),
+                    axleCountingHeadR.get("id")
+                ],
+                "name": "DE_AC01",
+                "rastaId": None,
+                "tpsName": id[:8]
+            }
+
+        self.topology.__dict__["axleCountingHeads"] = axleCountingHeads
         return {
             "edges": edges,
             "nodes": nodes,
@@ -76,7 +107,7 @@ class Exporter:
             "signals": signals,
             "axleCountingHeads": axleCountingHeads,
             "routes": {},
-            "trackVacancySections": {},
+            "trackVacancySections": trackVacancySections,
         }
 
     def export_placement(self) -> dict:
@@ -155,7 +186,9 @@ class Exporter:
 
         edges = {}
         for edge in self.topology.edges.values():
+            axleCountingHeads = [head for head in self.topology.__dict__.get("axleCountingHeads").values() if head.get("edge") == edge.uuid]
             items = [edge.node_a.uuid] if self.__is_point(edge.node_a) else []
+            items += [axleCountingHeads[0].get("id")] if axleCountingHeads[0].get("position") < 0.5 else [axleCountingHeads[1].get("id")]
             items += (
                 [
                     signal.uuid
@@ -164,6 +197,7 @@ class Exporter:
                 if len(edge.signals) > 0
                 else []
             )
+            items += [axleCountingHeads[0].get("id")] if axleCountingHeads[1].get("position") < 0.5 else [axleCountingHeads[1].get("id")]
             items += [edge.node_b.uuid] if self.__is_point(edge.node_b) else []
             edges[edge.uuid] = {"items": items, "orientation": "normal"}
 
