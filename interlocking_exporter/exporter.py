@@ -48,8 +48,7 @@ class Exporter:
                         )
                 previous_node = current_node
             output.append(route_json)
-        with open("driveways.json", "w", encoding="utf-8") as json_file:
-            json.dump(output, json_file)
+        return output
 
     def export_topology(self) -> dict:
         """Export the topology as a dict containing attributes needed by the Interlocking-UI.
