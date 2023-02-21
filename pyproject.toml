@@ -1,22 +1,22 @@
 [tool.poetry]
-name = "interlocking-ui-exporter"
+name = "interlocking-exporter"
 version = "0.9"
 description = ""
 authors = ["OSM HPI <OSM@HPI>"]
 readme = "README.md"
-packages = [{include = "interlocking_ui_exporter"}]
+packages = [{include = "interlocking_exporter"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
 yaramo = {git = "https://github.com/simulate-digital-rail/yaramo"}
 railway-route-generator = {git = "https://github.com/simulate-digital-rail/railway-route-generator.git"}
+vacancy-section-generator = {git = "https://github.com/simulate-digital-rail/vacancy-section-generator.git"}
 
 
 [tool.poetry.group.dev.dependencies]
 cli-importer = {git = "https://github.com/simulate-digital-rail/cli-importer"}
 orm-importer = {git = "https://github.com/simulate-digital-rail/orm-importer.git"}
 websockets = "^10.4"
-vacancy-section-generator = {git = "https://github.com/simulate-digital-rail/vacancy-section-generator.git"}
 
 [build-system]
 requires = ["poetry-core"]

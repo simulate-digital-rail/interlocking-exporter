@@ -199,7 +199,7 @@ zipp = "3.8.1"
 type = "git"
 url = "https://github.com/simulate-digital-rail/orm-importer.git"
 reference = "HEAD"
-resolved_reference = "0e17f75825ac3984622c8e8e1d2a58511aa0d4d1"
+resolved_reference = "f998fe9a49731cf568c05db65f6558044bfb4c72"
 
 [[package]]
 name = "overpy"
@@ -321,7 +321,7 @@ python-versions = ">=3.7"
 name = "vacancy-section-generator"
 version = "0.1.0"
 description = ""
-category = "dev"
+category = "main"
 optional = false
 python-versions = "^3.10"
 develop = false
@@ -376,7 +376,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=6)", "pytest-black (>=
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "d452084b929f15781fcde1dfbbe17b667947dfa3f3a29e335ebb32586110ed51"
+content-hash = "69b928197f9430a7088428d93af1b1ff830f66e5374d54628014a46a0a9eb761"
 
 [metadata.files]
 atomicwrites = [

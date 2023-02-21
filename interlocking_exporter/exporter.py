@@ -2,11 +2,16 @@ import json
 from yaramo.model import Topology, Node, Edge, SignalDirection, Signal
 from yaramo.additional_signal import AdditionalSignalZs3, AdditionalSignalZs3v
 from railwayroutegenerator.routegenerator import RouteGenerator
+from vacancy_section_generator.main import VacancySectionGenerator
+
 
 class Exporter:
-    def __init__(self, topology: Topology) -> None:
+    def __init__(self, topology: Topology, generate_routes = True, generate_vacancy_sections = True) -> None:
         self.topology = topology
-        RouteGenerator(self.topology).generate_routes()
+        if generate_vacancy_sections:
+            VacancySectionGenerator(topology).generate()
+        if generate_routes:
+            RouteGenerator(self.topology).generate_routes()
         self.__ensure_nodes_orientations()
 
     def export_routes(self):
