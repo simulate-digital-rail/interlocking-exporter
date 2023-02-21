@@ -1,6 +1,8 @@
+from collections import defaultdict
 import json
 from yaramo.model import Topology, Node, Edge, SignalDirection, Signal
-from yaramo.additional_signal import AdditionalSignalZs3, AdditionalSignalZs3v
+from yaramo.additional_signal import AdditionalSignalZs3, AdditionalSignalZs3v, AdditionalSignalZs2, AdditionalSignalZs2v
+from yaramo.signal import SignalKind
 from railwayroutegenerator.routegenerator import RouteGenerator
 from vacancy_section_generator.generator import VacancySectionGenerator
 
@@ -16,15 +18,37 @@ class Exporter:
 
     def export_routes(self):
         output = []
-        for route in self.topology.routes.values():
+        for route_uuid, route in self.topology.routes.items():
             previous_node = route.start_signal.previous_node()
-            route_json = []
-            signal_state, additional_signal_states = self.generate_signal_state(
-                route.start_signal, route.maximum_speed
-            )
-            route_json.append(signal_state)
-            for signal in additional_signal_states:
-                route_json.append(signal)
+            route_json = {
+                "start_signal": route.start_signal.uuid,
+                "end_signal": route.end_signal.uuid,
+            }
+            route_states = []
+            signal_state = self.generate_signal_state(route.start_signal, route.maximum_speed)
+            route_states.append(signal_state)
+            for edge in route.edges:
+                for vacancy_section in route.vacancy_sections:
+                    vacancy_section = {
+                        "type": "vacancy_section",
+                        "uuid": vacancy_section.uuid,
+                        "state": "free",
+                        "previous_signals": [],
+                    }
+                    if len(edge.signals) > 0:
+                        try:
+                            sig = next(
+                                (
+                                    sig.uuid
+                                    for sig in edge.signals
+                                    if sig.kind == SignalKind.Hauptsignal
+                                )
+                            )
+                            vacancy_section["previous_signals"].append(sig)
+                        except StopIteration:
+                            pass
+
+                    route_states.append(vacancy_section)
             for edge in route.edges:
                 # find out which node comes first on the driveway because edges can be oriented both ways
                 if edge.node_a == previous_node:
@@ -34,24 +58,25 @@ class Exporter:
                 # find out whether the previous point needs to be in a specific position
                 match current_node:
                     case previous_node.connected_on_left:
-                        route_json.append(
+                        route_states.append(
                             {"uuid": previous_node.uuid, "type": "point", "state": "left"}
                         )
                     case previous_node.connected_on_right:
-                        route_json.append(
+                        route_states.append(
                             {"uuid": previous_node.uuid, "type": "point", "state": "right"}
                         )
                 # find out whether the current point needs to be in a specific position
                 match previous_node:
                     case current_node.connected_on_left:
-                        route_json.append(
+                        route_states.append(
                             {"uuid": current_node.uuid, "type": "point", "state": "left"}
                         )
                     case current_node.connected_on_right:
-                        route_json.append(
+                        route_states.append(
                             {"uuid": current_node.uuid, "type": "point", "state": "right"}
                         )
                 previous_node = current_node
+            route_json["states"] = route_states
             output.append(route_json)
         return output
 
@@ -464,44 +489,61 @@ class Exporter:
         return visited_edges
 
     
-    def generate_signal_state(self,
-        signal: Signal, max_speed: int | None
-    ) -> tuple[dict, list[dict]]:
-        additional_signals = []
-        if max_speed:
-            for add_signal in signal.additional_signals:
-                if isinstance(add_signal, AdditionalSignalZs3):
-                    symbol = next(
-                        (s for s in add_signal.symbols if s.value == max_speed // 10), None
-                    )
-                    if symbol:
-                        additional_signals.append(
-                            {
-                                "uuid": add_signal.uuid,
-                                "type": "additional_signal_zs3",
-                                "symbols": [s.value for s in add_signal.symbols],
-                                "state": symbol.value,
-                            }
+    def generate_signal_state(self, signal: Signal, max_speed: int | None) -> dict:
+        target_state = {"main": "ks2"}
+        supported_states = defaultdict(list)
+        supported_states["main"] = [state.name for state in signal.supported_states]
+
+        for add_signal in signal.additional_signals:
+            if isinstance(add_signal, AdditionalSignalZs3):
+                supported_states["zs3"] = [s.value for s in add_signal.symbols]
+                if (
+                    max_speed
+                    and (
+                        symbol := AdditionalSignalZs3.AdditionalSignalSymbolZs3(
+                            max_speed // 10
                         )
-                if isinstance(add_signal, AdditionalSignalZs3v):
-                    symbol = next(
-                        (s for s in add_signal.symbols if s.value == max_speed // 10), None
                     )
-                    if symbol:
-                        additional_signals.append(
-                            {
-                                "uuid": add_signal.uuid,
-                                "type": "additional_signal_zs3v",
-                                "symbols": [s.value for s in add_signal.symbols],
-                                "state": symbol.value,
-                            }
+                    in add_signal.symbols
+                ):
+                    target_state["zs3"] = symbol.value
+            elif isinstance(add_signal, AdditionalSignalZs3v):
+                supported_states["zs3v"] = [s.value for s in add_signal.symbols]
+                if (
+                    max_speed
+                    and (
+                        symbol := AdditionalSignalZs3v.AdditionalSignalSymbolZs3v(
+                            max_speed // 10
                         )
-        return (
-            {
-                "uuid": signal.uuid,
-                "name": signal.name,
-                "type": "signal",
-                "state": "Ks1",
-            },
-            additional_signals,
-        )
+                    )
+                    in add_signal.symbols
+                ):
+                    target_state["zs3v"] = symbol.value
+            elif isinstance(
+                add_signal, AdditionalSignalZs2
+            ) or isinstance(add_signal, AdditionalSignalZs2v):
+                # Zs2 not supported in track_element yet
+                continue
+            else:
+                supported_states["additional"] += [
+                    symbol.name for symbol in add_signal.symbols
+                ]
+
+        if "zs3" in target_state.keys() and "hp2" in supported_states["main"]:
+            target_state["main"] = "hp2"
+        elif "hp2" in supported_states["main"] and not "hp1" in supported_states["main"]:
+            target_state["main"] = "hp2"
+        elif "hp1" in supported_states["main"]:
+            target_state["main"] = "hp1"
+        elif "ks2" in supported_states["main"]:
+            target_state["main"] = "ks2"
+        else:
+            raise Exception("Main Signal should support any of (Hp1, Hp2, Ks2)")
+
+        return {
+            "uuid": signal.uuid,
+            "name": signal.name,
+            "type": "signal",
+            "supported_states": supported_states,
+            "state": target_state,
+        }
