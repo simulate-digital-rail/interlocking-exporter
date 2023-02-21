@@ -535,8 +535,10 @@ class Exporter:
             target_state["main"] = "hp2"
         elif "hp1" in supported_states["main"]:
             target_state["main"] = "hp1"
-        elif "ks2" in supported_states["main"]:
+        elif signal.kind == SignalKind.Mehrabschnittssignal and "ks2" in supported_states["main"]:
             target_state["main"] = "ks2"
+        elif signal.kind == SignalKind.Hauptsignal and "ks1" in supported_states["main"]:
+            target_state["main"] = "ks1"
         else:
             raise Exception("Main Signal should support any of (Hp1, Hp2, Ks2)")
 
