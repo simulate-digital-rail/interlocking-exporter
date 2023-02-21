@@ -123,14 +123,14 @@ class Exporter:
                 "edge": id,
                 "id": Node().uuid,
                 "limits": [tvs.uuid],
-                "name": f"{edge.signals[0].name or id[:8]} / L",
+                "name": f"{edge.signals[0].name if edge.signals and edge.signals[0].name else id[:8]} / L",
                 "position": 0.1
             }
             axleCountingHeadR = {
                 "edge": id,
                 "id": Node().uuid,
                 "limits": [tvs.uuid],
-                "name": f"{edge.signals[-1].name or id[:8]} / R",
+                "name": f"{edge.signals[-1].name if edge.signals and edge.signals[-1].name else id[:8]} / R",
                 "position": 0.9
             }
             axleCountingHeads[axleCountingHeadL.get("id")] = axleCountingHeadL
