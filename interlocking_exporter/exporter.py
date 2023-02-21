@@ -2,7 +2,7 @@ import json
 from yaramo.model import Topology, Node, Edge, SignalDirection, Signal
 from yaramo.additional_signal import AdditionalSignalZs3, AdditionalSignalZs3v
 from railwayroutegenerator.routegenerator import RouteGenerator
-from vacancy_section_generator.main import VacancySectionGenerator
+from vacancy_section_generator.generator import VacancySectionGenerator
 
 
 class Exporter:
@@ -176,7 +176,7 @@ class Exporter:
 
     def export_placement(self) -> dict:
         """Export the placement of points and edges as a dict containing attributes needed by the Interlocking-UI"""
-        if self.topology.__dict__.get("axleCountingHeads"):
+        if not self.topology.__dict__.get("axleCountingHeads"):
             raise Exception("There are no axleCountingHeads in the topology. Try to run export_topology() first.")
         points = {}
         visited_edges = self.__map_connected_nodes_to_edge(self.topology.edges.values())
