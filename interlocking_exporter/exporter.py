@@ -176,6 +176,8 @@ class Exporter:
 
     def export_placement(self) -> dict:
         """Export the placement of points and edges as a dict containing attributes needed by the Interlocking-UI"""
+        if self.topology.__dict__.get("axleCountingHeads"):
+            raise Exception("There are no axleCountingHeads in the topology. Try to run export_topology() first.")
         points = {}
         visited_edges = self.__map_connected_nodes_to_edge(self.topology.edges.values())
         get_edges_from_nodes = lambda a, b: visited_edges.get((a, b))
