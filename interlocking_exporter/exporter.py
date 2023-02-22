@@ -275,6 +275,35 @@ class Exporter:
             }
             points[node.uuid] = point
 
+        edges_per_node = self.__group_edges_per_node(self.topology.edges.values())
+
+        def __set_edge_orientation(edge: Edge, previous_node: Node, orientation: str):
+            if edge.__dict__.get("orientation"):
+                return
+            edge.__dict__["orientation"] = orientation
+
+            next_node = edge.node_a if previous_node != edge.node_a else edge.node_b
+            next_edges = [_edge for _edge in edges_per_node[next_node.uuid] if _edge != edge]
+
+            for next_edge in next_edges:
+                double_edge = next_edge.node_a in [edge.node_a, edge.node_b] and next_edge.node_b in [edge.node_a, edge.node_b] 
+                flip = True if (next_node != next_edge.node_a and not double_edge) or (next_node == next_edge.node_a and double_edge) else False
+                next_orientation = "normal" if (orientation == "normal" and not flip) or (orientation == "reverse" and flip) else "reverse"
+
+                __set_edge_orientation(next_edge, next_node, next_orientation)
+
+        edges_per_nodes_length = {
+            node: len(items) for node, items in edges_per_node.items()
+        }
+
+        start_node = self.topology.nodes.get(
+            min(edges_per_nodes_length, key=edges_per_nodes_length.get)
+        )
+        start_edge = edges_per_node[start_node.uuid][0]
+
+        start_orientation = "normal" if start_edge.node_a == start_node else "reverse"
+        __set_edge_orientation(start_edge, start_node, start_orientation)
+
         edges = {}
         for edge in self.topology.edges.values():
             axleCountingHeads = [head for head in self.topology.__dict__.get("axleCountingHeads").values() if head.get("edge") == edge.uuid]
@@ -290,7 +319,7 @@ class Exporter:
             )
             items += [axleCountingHeads[0].get("id")] if axleCountingHeads[1].get("position") < 0.5 else [axleCountingHeads[1].get("id")]
             items += [edge.node_b.uuid] if self.__is_point(edge.node_b) else []
-            edges[edge.uuid] = {"items": items, "orientation": "normal"}
+            edges[edge.uuid] = {"items": items, "orientation": edge.__dict__.get("orientation")}
 
         return {"points": points, "edges": edges}
 
