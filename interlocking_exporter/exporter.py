@@ -21,8 +21,9 @@ class Exporter:
         for route_uuid, route in self.topology.routes.items():
             previous_node = route.start_signal.previous_node()
             route_json = {
-                "start_signal": route.start_signal.uuid,
-                "end_signal": route.end_signal.uuid,
+                "start_signal": self.generate_signal_state(route.start_signal, route.maximum_speed),
+                "end_signal": self.generate_signal_state(route.end_signal, route.maximum_speed),
+                "uuid": route_uuid
             }
             route_states = []
             signal_state = self.generate_signal_state(route.start_signal, route.maximum_speed)
@@ -39,7 +40,7 @@ class Exporter:
                         try:
                             sig = next(
                                 (
-                                    sig.uuid
+                                    self.generate_signal_state(sig, route.maximum_speed)
                                     for sig in edge.signals
                                     if sig.kind == SignalKind.Hauptsignal
                                 )
