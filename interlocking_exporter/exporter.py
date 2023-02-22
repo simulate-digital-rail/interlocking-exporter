@@ -109,6 +109,7 @@ class Exporter:
                 else "reverse",
             }
             for signal in self.topology.signals.values()
+            if self.__is_signal(signal)
         }
 
         points = {
@@ -301,7 +302,8 @@ class Exporter:
         )
         start_edge = edges_per_node[start_node.uuid][0]
 
-        start_orientation = "normal" if start_edge.node_a == start_node else "reverse"
+        # start_orientation = "normal" if start_edge.node_a == start_node else "reverse"
+        start_orientation = "normal"
         __set_edge_orientation(start_edge, start_node, start_orientation)
 
         edges = {}
@@ -313,6 +315,7 @@ class Exporter:
                 [
                     signal.uuid
                     for signal in sorted(edge.signals, key=lambda x: x.distance_edge)
+                    if self.__is_signal(signal)
                 ]
                 if len(edge.signals) > 0
                 else []
@@ -457,6 +460,9 @@ class Exporter:
 
     def __is_point(self, node: Node):
         return len(node.connected_nodes) == 3
+
+    def __is_signal(self, signal: Signal):
+        return signal.kind == SignalKind.Hauptsignal or signal.kind == SignalKind.Mehrabschnittssignal
 
     def __get_node_orientation_based_on_neighbours(self, node: Node):
         """Try to find the node orientation based on the connection to a neighbour.
