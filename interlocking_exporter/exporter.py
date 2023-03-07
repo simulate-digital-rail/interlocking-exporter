@@ -15,6 +15,7 @@ class Exporter:
         if generate_routes:
             RouteGenerator(self.topology).generate_routes()
         self.__ensure_nodes_orientations()
+        self.__add_axleCountingHeads_and_vacancySections()
 
     def export_routes(self):
         output = []
@@ -81,6 +82,43 @@ class Exporter:
             output.append(route_json)
         return output
 
+    
+    def __add_axleCountingHeads_and_vacancySections(self):
+        """This adds axleCountingHeads and trackVacancySections to the Topology, since they are needed the export."""
+        axleCountingHeads = {}
+        trackVacancySections = {}
+        for id, edge in self.topology.edges.items():
+            tvs = edge.vacancy_section
+            axleCountingHeadL = {
+                "edge": id,
+                "id": Node().uuid,
+                "limits": [tvs.uuid],
+                "name": f"{edge.signals[0].name if edge.signals and edge.signals[0].name else id[:8]} / L",
+                "position": 0.1
+            }
+            axleCountingHeadR = {
+                "edge": id,
+                "id": Node().uuid,
+                "limits": [tvs.uuid],
+                "name": f"{edge.signals[-1].name if edge.signals and edge.signals[-1].name else id[:8]} / R",
+                "position": 0.9
+            }
+            axleCountingHeads[axleCountingHeadL.get("id")] = axleCountingHeadL
+            axleCountingHeads[axleCountingHeadR.get("id")] = axleCountingHeadR
+
+            trackVacancySections[tvs.uuid] = {
+                "id": tvs.uuid,
+                "limits": [
+                    axleCountingHeadL.get("id"),
+                    axleCountingHeadR.get("id")
+                ],
+                "name": "DE_AC01",
+                "rastaId": None,
+                "tpsName": id[:8]
+            }
+        self.topology.__dict__["axleCountingHeads"] = axleCountingHeads
+        self.topology.__dict__["trackVacancySections"] = trackVacancySections
+    
     def export_topology(self) -> dict:
         """Export the topology as a dict containing attributes needed by the Interlocking-UI.
         This can optinally add extra AxleCountingHeads on edges that contain no further items."""
@@ -142,38 +180,6 @@ class Exporter:
             for edge_combination in edge_combinations
         }
 
-        axleCountingHeads = {}
-        trackVacancySections = {}
-        for id, edge in self.topology.edges.items():
-            tvs = edge.vacancy_section
-            axleCountingHeadL = {
-                "edge": id,
-                "id": Node().uuid,
-                "limits": [tvs.uuid],
-                "name": f"{edge.signals[0].name if edge.signals and edge.signals[0].name else id[:8]} / L",
-                "position": 0.1
-            }
-            axleCountingHeadR = {
-                "edge": id,
-                "id": Node().uuid,
-                "limits": [tvs.uuid],
-                "name": f"{edge.signals[-1].name if edge.signals and edge.signals[-1].name else id[:8]} / R",
-                "position": 0.9
-            }
-            axleCountingHeads[axleCountingHeadL.get("id")] = axleCountingHeadL
-            axleCountingHeads[axleCountingHeadR.get("id")] = axleCountingHeadR
-
-            trackVacancySections[tvs.uuid] = {
-                "id": tvs.uuid,
-                "limits": [
-                    axleCountingHeadL.get("id"),
-                    axleCountingHeadR.get("id")
-                ],
-                "name": "DE_AC01",
-                "rastaId": None,
-                "tpsName": id[:8]
-            }
-
         def flatten(l):
             return [item for sublist in l for item in sublist]
 
@@ -190,7 +196,8 @@ class Exporter:
 			    "tvps": [edge.vacancy_section.uuid for edge in route.edges]
             }
 
-        self.topology.__dict__["axleCountingHeads"] = axleCountingHeads
+        axleCountingHeads = self.topology.__dict__["axleCountingHeads"] 
+        trackVacancySections = self.topology.__dict__["trackVacancySections"] 
         return {
             "edges": edges,
             "nodes": nodes,
