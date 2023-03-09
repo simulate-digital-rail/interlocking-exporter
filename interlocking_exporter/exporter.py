@@ -58,22 +58,20 @@ class Exporter:
                 else:
                     current_node = edge.node_a
                 # find out whether the previous point needs to be in a specific position
-                match current_node:
-                    case previous_node.connected_on_left:
+                if current_node == previous_node.connected_on_left:
                         route_states.append(
                             {"uuid": previous_node.uuid, "type": "point", "state": "left"}
                         )
-                    case previous_node.connected_on_right:
+                elif current_node == previous_node.connected_on_right:
                         route_states.append(
                             {"uuid": previous_node.uuid, "type": "point", "state": "right"}
                         )
                 # find out whether the current point needs to be in a specific position
-                match previous_node:
-                    case current_node.connected_on_left:
+                if previous_node == current_node.connected_on_left:
                         route_states.append(
                             {"uuid": current_node.uuid, "type": "point", "state": "left"}
                         )
-                    case current_node.connected_on_right:
+                elif previous_node == current_node.connected_on_right:
                         route_states.append(
                             {"uuid": current_node.uuid, "type": "point", "state": "right"}
                         )
