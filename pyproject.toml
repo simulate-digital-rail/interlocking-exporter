@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "interlocking_exporter"}]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.8"
 yaramo = {git = "https://github.com/simulate-digital-rail/yaramo"}
 railway-route-generator = {git = "https://github.com/simulate-digital-rail/railway-route-generator.git"}
 vacancy-section-generator = {git = "https://github.com/simulate-digital-rail/vacancy-section-generator.git"}
