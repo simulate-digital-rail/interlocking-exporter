@@ -30,48 +30,50 @@ class Exporter:
             signal_state = self.generate_signal_state(route.start_signal, route.maximum_speed)
             route_states.append(signal_state)
             for edge in route.edges:
-                for vacancy_section in route.vacancy_sections:
-                    vacancy_section = {
-                        "type": "vacancy_section",
-                        "uuid": vacancy_section.uuid,
-                        "state": "free",
-                        "previous_signals": [],
-                    }
-                    if len(edge.signals) > 0:
-                        try:
-                            sig = next(
-                                (
-                                    self.generate_signal_state(sig, route.maximum_speed)
-                                    for sig in edge.signals
-                                    if sig.kind == SignalKind.Hauptsignal
-                                )
+                # export vacancy section
+                vacancy_section = {
+                    "type": "vacancy_section",
+                    "uuid": edge.vacancy_section.uuid,
+                    "state": "free",
+                    "previous_signals": [],
+                }
+                if len(edge.signals) > 0:
+                    try:
+                        sig = next(
+                            (
+                                self.generate_signal_state(sig, route.maximum_speed)
+                                for sig in edge.signals
+                                if sig.kind == SignalKind.Hauptsignal
                             )
-                            vacancy_section["previous_signals"].append(sig)
-                        except StopIteration:
-                            pass
+                        )
+                        vacancy_section["previous_signals"].append(sig)
+                    except StopIteration:
+                        pass
 
                     route_states.append(vacancy_section)
-            for edge in route.edges:
+
                 # find out which node comes first on the driveway because edges can be oriented both ways
                 if edge.node_a == previous_node:
                     current_node = edge.node_b
                 else:
                     current_node = edge.node_a
                 # find out whether the previous point needs to be in a specific position
-                if current_node == previous_node.connected_on_left:
+                match current_node:
+                    case previous_node.connected_on_left:
                         route_states.append(
                             {"uuid": previous_node.uuid, "type": "point", "state": "left"}
                         )
-                elif current_node == previous_node.connected_on_right:
+                    case previous_node.connected_on_right:
                         route_states.append(
                             {"uuid": previous_node.uuid, "type": "point", "state": "right"}
                         )
                 # find out whether the current point needs to be in a specific position
-                if previous_node == current_node.connected_on_left:
+                match previous_node:
+                    case current_node.connected_on_left:
                         route_states.append(
                             {"uuid": current_node.uuid, "type": "point", "state": "left"}
                         )
-                elif previous_node == current_node.connected_on_right:
+                    case current_node.connected_on_right:
                         route_states.append(
                             {"uuid": current_node.uuid, "type": "point", "state": "right"}
                         )
